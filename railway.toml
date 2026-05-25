@@ -1,9 +1,8 @@
 [build]
-builder = "nixpacks"
-buildCommand = "cd backend && python3 -m pip install -r requirements.txt && python3 manage.py collectstatic --noinput && python3 manage.py migrate --noinput"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "cd backend && python3 -m gunicorn sistathlon.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
 healthcheckPath = "/health/"
-healthcheckTimeout = 30
+healthcheckTimeout = 60
 restartPolicyType = "on_failure"
