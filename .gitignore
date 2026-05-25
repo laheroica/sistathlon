@@ -28,7 +28,7 @@ backend/db.sqlite3
 
 # Node / React
 frontend/node_modules/
-frontend/dist/
+# frontend/dist/ — commiteado para deploy en Railway (no requiere Node.js en el servidor)
 node_modules/
 
 # IDEs y herramientas locales
