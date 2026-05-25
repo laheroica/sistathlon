@@ -1,0 +1,403 @@
+import calendar
+from datetime import date
+from django.db.models import Sum, Count, Q
+from django.utils import timezone
+from rest_framework import generics, status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from apps.profes.models import Profe, ValorHoraProfe
+from apps.horarios.models import HorarioMaestro, HorarioReal, Feriado
+from .models import Liquidacion
+from .serializers import LiquidacionSerializer
+
+# lunes=0 ... sábado=5 → código del modelo
+DIA_MAP = {0: 'lun', 1: 'mar', 2: 'mie', 3: 'jue', 4: 'vie', 5: 'sab'}
+
+
+# ── Función de cálculo ────────────────────────────────────────────────────────
+
+def maestros_vigentes_en(fecha, todos_maestros):
+    """
+    Dado un listado completo de HorarioMaestro (activos, ordenados por fecha_desde asc),
+    devuelve los vigentes en `fecha`: para cada slot (sede, dia, hora, disciplina)
+    toma la versión más reciente cuya fecha_desde <= fecha.
+    """
+    dia_str = DIA_MAP.get(fecha.weekday())
+    if not dia_str:
+        return []
+
+    candidatos = [m for m in todos_maestros if m.dia == dia_str and m.fecha_desde <= fecha]
+
+    # Por cada slot, queda el último (mayor fecha_desde) → ya viene ordenado asc
+    vigentes = {}
+    for m in candidatos:
+        key = (m.sede, m.dia, m.hora, m.disciplina)
+        vigentes[key] = m   # sobrescribe: el más reciente gana
+
+    # Solo devolver slots cuya versión más reciente esté activa
+    return [m for m in vigentes.values() if m.activo]
+
+
+def calcular_clases_mes(year, month):
+    """
+    Devuelve dict { profe_id: { profe, clases: [...] } }
+    con todas las clases del mes usando la versión de la maestra
+    vigente en cada fecha (date-sensitive).
+    """
+    _, num_dias = calendar.monthrange(year, month)
+    fechas = [date(year, month, d) for d in range(1, num_dias + 1)]
+
+    # Feriados sin clases
+    feriados_cerrados = set(
+        Feriado.objects.filter(fecha__year=year, fecha__month=month, abrimos=False)
+        .values_list('fecha', flat=True)
+    )
+
+    # Todos los maestros (activos e inactivos) con fecha_desde <= último día del mes.
+    # Se incluyen los inactivos para que el versionado detecte correctamente
+    # cuándo un slot fue "apagado" (la versión más reciente es activo=False).
+    ultimo_dia = date(year, month, num_dias)
+    todos_maestros = list(
+        HorarioMaestro.objects.filter(fecha_desde__lte=ultimo_dia)
+        .select_related('profe')
+        .order_by('fecha_desde')   # orden asc → el último sobrescribe por slot
+    )
+
+    # Modificaciones del mes
+    reales = HorarioReal.objects.filter(
+        fecha__year=year, fecha__month=month
+    ).select_related('profe_real', 'profe_planificado')
+
+    # Index por (fecha, hora, sede, disciplina)
+    reales_idx = {}
+    for r in reales:
+        key = (r.fecha, r.hora, r.sede, r.disciplina)
+        reales_idx[key] = r
+
+    por_profe = {}
+
+    for fecha in fechas:
+        if fecha in feriados_cerrados:
+            continue
+        if fecha.weekday() == 6:   # domingo
+            continue
+
+        dia_str = DIA_MAP.get(fecha.weekday(), '')
+
+        for maestro in maestros_vigentes_en(fecha, todos_maestros):
+            key = (fecha, maestro.hora, maestro.sede, maestro.disciplina)
+            real = reales_idx.get(key)
+
+            if real and real.profe_real_id:
+                profe_obj = real.profe_real
+                es_mod = True
+                profe_plan_nombre = real.profe_planificado.nombre if real.profe_planificado else '—'
+            else:
+                profe_obj = maestro.profe
+                es_mod = False
+                profe_plan_nombre = maestro.profe.nombre if maestro.profe else '—'
+
+            if profe_obj is None:
+                continue
+
+            pid = profe_obj.id
+            if pid not in por_profe:
+                por_profe[pid] = {'profe': profe_obj, 'clases': []}
+
+            por_profe[pid]['clases'].append({
+                'fecha': str(fecha),
+                'dia': dia_str,
+                'hora': maestro.hora.strftime('%H:%M'),
+                'disciplina': maestro.disciplina,
+                'sede': maestro.sede,
+                'es_modificacion': es_mod,
+                'profe_planificado': profe_plan_nombre,
+            })
+
+    return por_profe
+
+
+def armar_resultado_profe(profe, clases, year, month, liq=None):
+    """Aplica tarifa y devuelve el dict con todos los datos del profe."""
+    count = len(clases)
+
+    # Tarifa del mes (o la más reciente si no hay del mes exacto)
+    vh = (
+        ValorHoraProfe.objects.filter(profe=profe, mes__year=year, mes__month=month).first()
+        or ValorHoraProfe.objects.filter(profe=profe).order_by('-mes').first()
+    )
+
+    valor_hora = round(float(vh.valor_hora), 2) if vh else 0
+    sueldo_fijo = round(float(vh.sueldo_fijo), 2) if vh and vh.sueldo_fijo else 0
+    porcentaje = round(float(vh.porcentaje), 2) if vh and vh.porcentaje else 0
+
+    tipo = profe.tipo_liquidacion
+    if tipo == 'hora':
+        monto_calc = round(count * valor_hora, 2)
+    elif tipo == 'fijo':
+        monto_calc = sueldo_fijo
+    else:  # porcentaje — requiere dato de recaudación, se deja en 0 para ingresar manual
+        monto_calc = 0
+
+    return {
+        'profe_id': profe.id,
+        'profe_nombre': profe.nombre,
+        'profe_color': profe.color,
+        'tipo_liquidacion': tipo,
+        'clases_dadas': count,
+        'valor_hora': valor_hora,
+        'sueldo_fijo': sueldo_fijo,
+        'porcentaje': porcentaje,
+        'monto_calculado': monto_calc,
+        'clases': sorted(clases, key=lambda c: (c['fecha'], c['hora'])),
+        # Si ya hay liquidación guardada
+        'liquidacion_id': liq.id if liq else None,
+        'monto_final': round(float(liq.monto_final), 2) if liq else monto_calc,
+        'confirmada': liq.confirmada if liq else False,
+        'pagada': liq.pagada if liq else False,
+        'fecha_pago': str(liq.fecha_pago) if liq and liq.fecha_pago else None,
+        'notas': liq.notas if liq else '',
+    }
+
+
+# ── Views ─────────────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+def preview_liquidacion(request):
+    """
+    Calcula la liquidación del mes sin guardar.
+    GET /liquidaciones/preview/?mes=2026-05
+    """
+    mes_str = request.GET.get('mes', '')
+    try:
+        year, month = map(int, mes_str.split('-'))
+        mes_date = date(year, month, 1)
+    except Exception:
+        return Response({'error': 'Parámetro mes inválido. Usar YYYY-MM.'}, status=400)
+
+    por_profe = calcular_clases_mes(year, month)
+
+    # Liquidaciones ya guardadas para este mes
+    liqqs = {liq.profe_id: liq for liq in Liquidacion.objects.filter(mes=mes_date).select_related('profe')}
+
+    resultado = []
+    for pid, data in por_profe.items():
+        liq = liqqs.get(pid)
+        resultado.append(
+            armar_resultado_profe(data['profe'], data['clases'], year, month, liq)
+        )
+
+    resultado.sort(key=lambda x: x['profe_nombre'])
+
+    return Response({
+        'mes': mes_str,
+        'total_calculado': round(sum(r['monto_calculado'] for r in resultado), 2),
+        'total_final': round(sum(r['monto_final'] for r in resultado), 2),
+        'confirmadas': sum(1 for r in resultado if r['confirmada']),
+        'pagadas': sum(1 for r in resultado if r['pagada']),
+        'profes': resultado,
+    })
+
+
+@api_view(['POST'])
+def guardar_liquidacion(request):
+    """
+    Guarda o actualiza la liquidación de un profe para un mes.
+    POST /liquidaciones/guardar/
+    Body: { profe_id, mes, clases_dadas, valor_hora, sueldo_fijo, porcentaje,
+            monto_calculado, monto_final, notas, confirmar }
+    """
+    data = request.data
+    mes_str = data.get('mes', '')
+    try:
+        year, month = map(int, mes_str.split('-'))
+        mes_date = date(year, month, 1)
+    except Exception:
+        return Response({'error': 'mes inválido'}, status=400)
+
+    try:
+        profe = Profe.objects.get(id=data['profe_id'])
+    except Profe.DoesNotExist:
+        return Response({'error': 'Profe no encontrado'}, status=404)
+
+    # Recalcular detalle fresco
+    por_profe = calcular_clases_mes(year, month)
+    clases = por_profe.get(profe.id, {}).get('clases', [])
+    clases = sorted(clases, key=lambda c: (c['fecha'], c['hora']))
+
+    liq, _ = Liquidacion.objects.get_or_create(profe=profe, mes=mes_date)
+
+    liq.tipo_liquidacion = profe.tipo_liquidacion
+    liq.clases_dadas = data.get('clases_dadas', len(clases))
+    liq.valor_hora = data.get('valor_hora', 0)
+    liq.sueldo_fijo = data.get('sueldo_fijo', 0)
+    liq.porcentaje = data.get('porcentaje', 0)
+    liq.monto_calculado = data.get('monto_calculado', 0)
+    liq.monto_final = data.get('monto_final', data.get('monto_calculado', 0))
+    liq.notas = data.get('notas', '')
+    liq.detalle = clases
+
+    if data.get('confirmar') and not liq.confirmada:
+        liq.confirmada = True
+        liq.fecha_confirmacion = timezone.now()
+
+    liq.save()
+    return Response(LiquidacionSerializer(liq).data)
+
+
+@api_view(['POST'])
+def marcar_pagada(request, pk):
+    """PATCH /liquidaciones/{id}/pagar/"""
+    try:
+        liq = Liquidacion.objects.get(pk=pk)
+    except Liquidacion.DoesNotExist:
+        return Response({'error': 'No encontrada'}, status=404)
+
+    liq.pagada = True
+    liq.fecha_pago = request.data.get('fecha_pago') or date.today()
+    liq.save()
+    return Response(LiquidacionSerializer(liq).data)
+
+
+class LiquidacionListView(generics.ListAPIView):
+    serializer_class = LiquidacionSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = Liquidacion.objects.select_related('profe').all()
+        mes_str = self.request.GET.get('mes')
+        if mes_str:
+            try:
+                year, month = map(int, mes_str.split('-'))
+                qs = qs.filter(mes__year=year, mes__month=month)
+            except Exception:
+                pass
+        return qs
+
+
+class LiquidacionDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Liquidacion.objects.select_related('profe').all()
+    serializer_class = LiquidacionSerializer
+
+
+# ── Cierre de mes ─────────────────────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cerrar_mes(request):
+    """
+    Cierra el mes: crea/actualiza Liquidacion para todos los profes con clases,
+    marcándolas como confirmadas y guardando el snapshot de clases.
+    POST /liquidaciones/cerrar-mes/
+    Body: { mes: 'YYYY-MM', ajustes: [{profe_id, monto_final, notas}] }
+    """
+    mes_str = request.data.get('mes', '')
+    ajustes = {a['profe_id']: a for a in request.data.get('ajustes', [])}
+
+    try:
+        year, month = map(int, mes_str.split('-'))
+        mes_date = date(year, month, 1)
+    except Exception:
+        return Response({'error': 'mes inválido'}, status=400)
+
+    por_profe = calcular_clases_mes(year, month)
+    guardadas = []
+
+    for pid, data in por_profe.items():
+        profe = data['profe']
+        clases = sorted(data['clases'], key=lambda c: (c['fecha'], c['hora']))
+
+        vh = (
+            ValorHoraProfe.objects.filter(profe=profe, mes__year=year, mes__month=month).first()
+            or ValorHoraProfe.objects.filter(profe=profe).order_by('-mes').first()
+        )
+        valor_hora  = float(vh.valor_hora)  if vh else 0
+        sueldo_fijo = float(vh.sueldo_fijo) if vh and vh.sueldo_fijo else 0
+        porcentaje  = float(vh.porcentaje)  if vh and vh.porcentaje  else 0
+
+        count = len(clases)
+        tipo  = profe.tipo_liquidacion
+        if tipo == 'hora':
+            monto_calc = round(count * valor_hora, 2)
+        elif tipo == 'fijo':
+            monto_calc = sueldo_fijo
+        else:
+            monto_calc = 0
+
+        aj = ajustes.get(pid, {})
+        monto_final = aj.get('monto_final', monto_calc)
+        notas       = aj.get('notas', '')
+
+        liq, _ = Liquidacion.objects.get_or_create(profe=profe, mes=mes_date)
+        liq.tipo_liquidacion  = tipo
+        liq.clases_dadas      = count
+        liq.valor_hora        = valor_hora
+        liq.sueldo_fijo       = sueldo_fijo
+        liq.porcentaje        = porcentaje
+        liq.monto_calculado   = monto_calc
+        liq.monto_final       = monto_final
+        liq.notas             = notas
+        liq.detalle           = clases
+        if not liq.confirmada:
+            liq.confirmada          = True
+            liq.fecha_confirmacion  = timezone.now()
+        liq.save()
+        guardadas.append(liq)
+
+    return Response({
+        'mes': mes_str,
+        'total_profes': len(guardadas),
+        'monto_total': round(sum(float(l.monto_final) for l in guardadas), 2),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def meses_cerrados(request):
+    """
+    Lista de meses que tienen al menos una liquidación confirmada.
+    GET /liquidaciones/meses-cerrados/
+    """
+    meses = (
+        Liquidacion.objects
+        .filter(confirmada=True)
+        .values('mes')
+        .annotate(
+            total_profes=Count('id'),
+            monto_total=Sum('monto_final'),
+            pagadas=Count('id', filter=Q(pagada=True)),
+        )
+        .order_by('-mes')
+    )
+
+    return Response([{
+        'mes':          m['mes'].strftime('%Y-%m'),
+        'total_profes': m['total_profes'],
+        'monto_total':  round(float(m['monto_total'] or 0), 2),
+        'pagadas':      m['pagadas'],
+    } for m in meses])
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def detalle_cierre(request, mes_str):
+    """
+    Detalle de un mes cerrado: todas las liquidaciones confirmadas.
+    GET /liquidaciones/cierre/2026-05/
+    """
+    try:
+        year, month = map(int, mes_str.split('-'))
+        mes_date = date(year, month, 1)
+    except Exception:
+        return Response({'error': 'mes inválido'}, status=400)
+
+    liqs = (
+        Liquidacion.objects
+        .filter(mes=mes_date, confirmada=True)
+        .select_related('profe')
+        .order_by('profe__nombre')
+    )
+
+    return Response(LiquidacionSerializer(liqs, many=True).data)

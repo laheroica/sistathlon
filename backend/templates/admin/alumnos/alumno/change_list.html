@@ -1,0 +1,45 @@
+{% extends "admin/change_list.html" %}
+
+{% block search %}
+{{ block.super }}
+
+{% if filtros_activos %}
+<div style="
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 4px 0;
+  padding: 8px 12px;
+  background: #e8f4fd;
+  border-left: 4px solid #417690;
+  border-radius: 0 4px 4px 0;
+">
+  <span style="font-size:12px; color:#417690; font-weight:bold; margin-right:4px;">
+    Filtros activos:
+  </span>
+  {% for filtro in filtros_activos %}
+  <span style="
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #417690;
+    color: white;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+  ">
+    {{ filtro.label }}
+    <a href="{{ filtro.url_sin_este }}"
+       style="color:white; text-decoration:none; font-weight:bold; font-size:14px; line-height:1;"
+       title="Quitar este filtro">×</a>
+  </span>
+  {% endfor %}
+  <a href="?" style="font-size:11px; color:#666; margin-left:4px;">
+    Limpiar todos
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}

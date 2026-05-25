@@ -1,0 +1,271 @@
+from datetime import date
+from django.db.models import Sum, Count, ExpressionWrapper, DecimalField, F
+from django.db.models.functions import TruncMonth
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard(request):
+    from apps.alumnos.models import Alumno
+    from apps.pagos.models import Pago
+
+    hoy        = date.today()
+    mes_actual = date(hoy.year, hoy.month, 1)
+    mes_ant    = date(hoy.year, hoy.month - 1, 1) if hoy.month > 1 else date(hoy.year - 1, 12, 1)
+
+    rec_actual  = Pago.objects.filter(mes=mes_actual).aggregate(t=Sum('monto'))['t'] or 0
+    rec_ant     = Pago.objects.filter(mes=mes_ant).aggregate(t=Sum('monto'))['t'] or 0
+    pagos_hoy   = Pago.objects.filter(fecha_pago=hoy).count()
+
+    estados = dict(
+        Alumno.objects.filter(activo=True)
+        .values_list('estado')
+        .annotate(n=Count('id'))
+    )
+
+    meses_grafico = []
+    for i in range(5, -1, -1):
+        m = i
+        anio = hoy.year
+        mes_n = hoy.month - m
+        while mes_n <= 0:
+            mes_n += 12
+            anio  -= 1
+        d = date(anio, mes_n, 1)
+        total = Pago.objects.filter(mes=d).aggregate(t=Sum('monto'))['t'] or 0
+        meses_grafico.append({'mes': d.strftime('%b %Y'), 'total': float(total)})
+
+    disc_mes = list(
+        Pago.objects.filter(mes=mes_actual)
+        .values('alumno__disciplina')
+        .annotate(total=Sum('monto'), cant=Count('id'))
+        .order_by('-total')
+    )
+
+    por_sede = dict(
+        Alumno.objects.filter(activo=True)
+        .values_list('sede')
+        .annotate(n=Count('id'))
+    )
+
+    from django.db.models import Max
+    alumnos_qs = Alumno.objects.filter(activo=True).annotate(
+        ultimo_pago_fecha=Max('pagos__fecha_pago')
+    )
+    sin_pago_30  = alumnos_qs.filter(
+        __import__('django').db.models.Q(ultimo_pago_fecha__isnull=True) |
+        __import__('django').db.models.Q(ultimo_pago_fecha__lt=date(hoy.year, hoy.month, 1) - __import__('datetime').timedelta(days=30))
+    ).count()
+
+    pagos_por_dia = list(
+        Pago.objects.filter(mes=mes_actual)
+        .values('fecha_pago')
+        .annotate(cant=Count('id'), total=Sum('monto'))
+        .order_by('fecha_pago')
+    )
+
+    return Response({
+        'recaudacion': {
+            'mes_actual':  float(rec_actual),
+            'mes_anterior': float(rec_ant),
+            'variacion_pct': round((float(rec_actual) - float(rec_ant)) / float(rec_ant) * 100, 1) if rec_ant else 0,
+            'pagos_hoy':   pagos_hoy,
+        },
+        'alumnos': {
+            'total':    sum(estados.values()),
+            'activo':   estados.get('activo', 0),
+            'mora':     estados.get('mora', 0),
+            'alejado':  estados.get('alejado', 0),
+            'temporal': estados.get('temporal', 0),
+            'baja':     estados.get('baja', 0),
+        },
+        'por_sede': {'107': por_sede.get('107', 0), '24':  por_sede.get('24', 0)},
+        'grafico_meses':  meses_grafico,
+        'disc_mes_actual': disc_mes,
+        'pagos_por_dia':  [
+            {'fecha': p['fecha_pago'].strftime('%d/%m'), 'cant': p['cant'], 'total': float(p['total'])}
+            for p in pagos_por_dia
+        ],
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def anual(request):
+    from apps.alumnos.models import Alumno
+    from apps.pagos.models import Pago
+    from apps.liquidaciones.models import Liquidacion
+    from apps.caja.models import GastoFijo, GastoExtra
+
+    hoy = date.today()
+    n_meses = min(int(request.GET.get('meses', 12)), 24)
+
+    # Build list of first-day-of-month dates (oldest first)
+    meses = []
+    for i in range(n_meses - 1, -1, -1):
+        mes_n = hoy.month - i
+        anio = hoy.year
+        while mes_n <= 0:
+            mes_n += 12
+            anio -= 1
+        meses.append(date(anio, mes_n, 1))
+
+    # ── Pagos bulk: grouped by (mes, sede) ───────────────────────────────────
+    pagos_by_key = {}
+    for row in (
+        Pago.objects.filter(mes__in=meses)
+        .values('mes', 'alumno__sede')
+        .annotate(total=Sum('monto'), cant=Count('id'))
+    ):
+        pagos_by_key[(row['mes'], row['alumno__sede'])] = {
+            'total': float(row['total']),
+            'cant': row['cant'],
+        }
+
+    # ── Métodos de pago (últimos 3 meses) ────────────────────────────────────
+    mes_3 = meses[-3] if len(meses) >= 3 else meses[0]
+    metodos_pago = list(
+        Pago.objects.filter(mes__gte=mes_3)
+        .values('metodo')
+        .annotate(cant=Count('id'), total=Sum('monto'))
+    )
+
+    # ── Liquidaciones profes ──────────────────────────────────────────────────
+    liq_by_mes = {
+        row['mes']: float(row['total'])
+        for row in Liquidacion.objects.filter(mes__in=meses, confirmada=True)
+        .values('mes').annotate(total=Sum('monto_final'))
+    }
+
+    # ── Gastos fijos ──────────────────────────────────────────────────────────
+    gfijo_by_mes = {
+        row['mes']: float(row['total'])
+        for row in GastoFijo.objects.filter(mes__in=meses)
+        .values('mes').annotate(total=Sum('importe'))
+    }
+
+    # ── Gastos extras (precio_unitario * cantidad) ────────────────────────────
+    gextra_by_mes = {}
+    for row in (
+        GastoExtra.objects.filter(mes__in=meses)
+        .annotate(subtotal=ExpressionWrapper(
+            F('precio_unitario') * F('cantidad'),
+            output_field=DecimalField(max_digits=14, decimal_places=2)
+        ))
+        .values('mes')
+        .annotate(total=Sum('subtotal'))
+    ):
+        gextra_by_mes[row['mes']] = float(row['total'])
+
+    # ── Nuevos alumnos por mes ────────────────────────────────────────────────
+    nuevos_by_mes = {}
+    for row in (
+        Alumno.objects.filter(fecha_inicio__gte=meses[0])
+        .annotate(mes_inicio=TruncMonth('fecha_inicio'))
+        .values('mes_inicio')
+        .annotate(cant=Count('id'))
+    ):
+        k = row['mes_inicio']
+        if hasattr(k, 'date'):
+            k = k.date()
+        nuevos_by_mes[k] = row['cant']
+
+    # ── Build series ──────────────────────────────────────────────────────────
+    series = []
+    for mes in meses:
+        r107 = pagos_by_key.get((mes, '107'), {'total': 0, 'cant': 0})
+        r24  = pagos_by_key.get((mes, '24'),  {'total': 0, 'cant': 0})
+        rec  = r107['total'] + r24['total']
+        pag  = r107['cant']  + r24['cant']
+
+        gp = liq_by_mes.get(mes, 0)
+        gf = gfijo_by_mes.get(mes, 0)
+        ge = gextra_by_mes.get(mes, 0)
+        gt = gp + gf + ge
+
+        series.append({
+            'mes':        mes.strftime('%b %y'),
+            'mes_key':    mes.strftime('%Y-%m'),
+            'recaudado':  round(rec),
+            'rec_107':    round(r107['total']),
+            'rec_24':     round(r24['total']),
+            'pagadores':  pag,
+            'pag_107':    r107['cant'],
+            'pag_24':     r24['cant'],
+            'ticket':     round(rec / pag) if pag else 0,
+            'ticket_107': round(r107['total'] / r107['cant']) if r107['cant'] else 0,
+            'ticket_24':  round(r24['total'] / r24['cant']) if r24['cant'] else 0,
+            'g_profes':   round(gp),
+            'g_fijos':    round(gf),
+            'g_extras':   round(ge),
+            'gastos':     round(gt),
+            'balance':    round(rec - gt),
+            'nuevos':     nuevos_by_mes.get(mes, 0),
+        })
+
+    # Variación neta y estimación de abandonos
+    for i, s in enumerate(series):
+        variacion = s['pagadores'] - series[i - 1]['pagadores'] if i > 0 else 0
+        s['variacion_neta'] = variacion
+        # abandonaron = ingresaron - variacion_neta  (si entran 10 y sube 3, se fueron 7)
+        abandonaron = max(0, s['nuevos'] - variacion)
+        s['abandonaron']     = abandonaron
+        s['abandonaron_neg'] = -abandonaron  # valor negativo para gráfico hacia abajo
+
+    # ── Snapshot actual ───────────────────────────────────────────────────────
+    # Usamos el último mes con pagos registrados como referencia
+    from apps.pagos.models import Pago as PagoModel
+    ultimo_mes_con_pagos = (
+        PagoModel.objects.order_by('-mes').values_list('mes', flat=True).first()
+    )
+    mes_snapshot = ultimo_mes_con_pagos or mes_actual
+
+    # IDs de alumnos que pagaron ese mes
+    pagadores_ids = PagoModel.objects.filter(mes=mes_snapshot).values_list('alumno_id', flat=True)
+
+    total_activos = len(set(pagadores_ids))
+
+    por_disciplina = list(
+        Alumno.objects.filter(id__in=pagadores_ids)
+        .values('disciplina').annotate(cant=Count('id')).order_by('-cant')
+    )
+    # Histórico: todos los alumnos que alguna vez pasaron por el gym
+    por_disciplina_historico = list(
+        Alumno.objects.values('disciplina').annotate(cant=Count('id')).order_by('-cant')
+    )
+    por_sede = list(
+        Alumno.objects.filter(id__in=pagadores_ids)
+        .values('sede').annotate(cant=Count('id'))
+    )
+
+    # Variaciones del último mes vs anterior
+    ultimo   = series[-1]  if len(series) >= 1 else {}
+    anterior = series[-2]  if len(series) >= 2 else {}
+    rec_ult  = ultimo.get('recaudado', 0)
+    rec_ant2 = anterior.get('recaudado', 0)
+    pag_ult  = ultimo.get('pagadores', 0)
+    pag_ant2 = anterior.get('pagadores', 0)
+
+    var_facturacion = round((rec_ult - rec_ant2) / rec_ant2 * 100, 1) if rec_ant2 else 0
+    var_alumnos     = round((pag_ult - pag_ant2) / pag_ant2 * 100, 1) if pag_ant2 else 0
+
+    return Response({
+        'series': series,
+        'snapshot': {
+            'por_disciplina':           por_disciplina,
+            'por_disciplina_historico': por_disciplina_historico,
+            'por_sede':                 por_sede,
+            'metodos_pago': [
+                {'metodo': m['metodo'], 'cant': m['cant'], 'total': float(m['total'])}
+                for m in metodos_pago
+            ],
+            'total_activos':        total_activos,
+            'mes_snapshot':         mes_snapshot.strftime('%B %Y'),
+            'ticket_ultimo_mes':    ultimo.get('ticket', 0),
+            'var_facturacion_pct':  var_facturacion,
+            'var_alumnos_pct':      var_alumnos,
+        },
+    })

@@ -1,0 +1,467 @@
+import { useState, useEffect } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { DollarSign, Calendar, CreditCard, Check, Trash2, AlertTriangle } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { format, startOfMonth } from 'date-fns'
+import { es } from 'date-fns/locale'
+import SlidePanel from '../ui/SlidePanel'
+import api from '../../lib/api'
+import clsx from 'clsx'
+import { money } from '../../lib/format'
+
+// ─── Constantes ────────────────────────────────────────────────────────────────
+const DISC_LABEL  = { CF: 'CrossFit', HF: 'Heavy Func.', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus' }
+const DISC_BADGE  = {
+  CF: 'bg-blue-900/70 text-blue-200', HF: 'bg-green-900/70 text-green-200',
+  HX: 'bg-yellow-900/70 text-yellow-200', TN: 'bg-purple-900/70 text-purple-200',
+  KD: 'bg-pink-900/70 text-pink-200', BP: 'bg-sky-900/70 text-sky-200',
+}
+const ESTADO_COLOR = {
+  activo: 'text-green-400', mora: 'text-yellow-400',
+  baja: 'text-orange-400', alejado: 'text-red-400', temporal: 'text-sky-400',
+}
+const FRECUENCIAS = {
+  CF: ['2x','3x','libre'], HF: ['2x','3x','5x'],
+  HX: ['3x'], TN: ['3x'], KD: ['3x'], BP: ['3x'],
+}
+const FREQ_LABEL = { '2x': '2×/sem', '3x': '3×/sem', '5x': '5×/sem', libre: 'Libre' }
+const HORARIOS   = ['06:00','07:00','08:00','09:00','10:00','11:00','17:00','18:00','19:00','20:00','21:00']
+
+function mesOptions() {
+  const opts = []
+  const hoy  = new Date()
+  for (let i = -1; i <= 2; i++) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1)
+    opts.push({
+      value: format(d, 'yyyy-MM-dd'),
+      label: format(d, 'MMMM yyyy', { locale: es }).replace(/^\w/, c => c.toUpperCase()),
+    })
+  }
+  return opts
+}
+
+const pagoSchema = z.object({
+  mes:        z.string().min(1),
+  monto:      z.coerce.number().positive('Ingresá un monto válido'),
+  fecha_pago: z.string().min(1),
+  metodo:     z.enum(['efectivo', 'transferencia', 'debito']),
+  notas:      z.string().optional(),
+})
+
+// ─── Campo editable inline ─────────────────────────────────────────────────────
+function CampoEditable({ label, value, onSave, type = 'text', placeholder = '' }) {
+  const [editing, setEditing] = useState(false)
+  const [local, setLocal]     = useState(value ?? '')
+
+  useEffect(() => { setLocal(value ?? '') }, [value])
+
+  function confirmar() {
+    setEditing(false)
+    if (local !== (value ?? '')) onSave(local)
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type={type}
+        value={local}
+        placeholder={placeholder}
+        onChange={e => setLocal(e.target.value)}
+        onBlur={confirmar}
+        onKeyDown={e => { if (e.key === 'Enter') confirmar(); if (e.key === 'Escape') { setLocal(value ?? ''); setEditing(false) } }}
+        className="input text-sm py-1 h-8"
+      />
+    )
+  }
+
+  return (
+    <button type="button" onClick={() => setEditing(true)}
+      className="text-sm text-dark-text hover:text-indigo-300 text-left truncate transition-colors w-full"
+      title="Clic para editar"
+    >
+      {value || <span className="text-dark-muted/50 italic">{placeholder || `Sin ${label.toLowerCase()}`}</span>}
+    </button>
+  )
+}
+
+// ─── Selector de chip ──────────────────────────────────────────────────────────
+function ChipSelector({ options, value, onChange, renderLabel, className = '' }) {
+  return (
+    <div className={clsx('flex flex-wrap gap-1.5', className)}>
+      {options.map((opt) => {
+        const val = typeof opt === 'string' ? opt : opt.value
+        const lbl = typeof opt === 'string' ? opt : opt.label
+        const active = value === val
+        return (
+          <button
+            key={val}
+            type="button"
+            onClick={() => onChange(val)}
+            className={clsx(
+              'px-2.5 py-1 rounded-lg text-xs font-medium border transition-all',
+              active
+                ? 'bg-primary-dark border-primary-dark text-white'
+                : 'border-dark-border text-dark-muted hover:border-primary-dark/50 hover:text-dark-text'
+            )}
+          >
+            {renderLabel ? renderLabel(val, lbl) : lbl}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Componente principal ──────────────────────────────────────────────────────
+export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) {
+  const qc   = useQueryClient()
+  const meses = mesOptions()
+
+  // Estado local del alumno (para reflejar cambios inmediatos en la UI)
+  const [alumno, setAlumno] = useState(alumnoInit)
+  useEffect(() => { setAlumno(alumnoInit) }, [alumnoInit])
+
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm({
+    resolver: zodResolver(pagoSchema),
+    defaultValues: {
+      mes:        format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+      fecha_pago: format(new Date(), 'yyyy-MM-dd'),
+      metodo:     'efectivo',
+      monto:      '',
+      notas:      '',
+    },
+  })
+
+  useEffect(() => {
+    if (alumnoInit) {
+      reset({
+        mes:        format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+        fecha_pago: format(new Date(), 'yyyy-MM-dd'),
+        metodo:     'efectivo',
+        monto:      alumnoInit.ultimo_pago?.monto || alumnoInit.cuota_actual || '',
+        notas:      '',
+      })
+    }
+  }, [alumnoInit, reset])
+
+  // PATCH campo del alumno
+  const patchAlumno = useMutation({
+    mutationFn: (data) => api.patch(`/alumnos/${alumno.id}/`, data),
+    onSuccess: (res) => {
+      setAlumno(prev => ({ ...prev, ...res.data }))
+      qc.invalidateQueries({ queryKey: ['alumnos'] })
+      toast.success('Guardado')
+    },
+    onError: (err) => {
+      const data = err.response?.data
+      const msg = typeof data === 'string'
+        ? data
+        : data?.detail || Object.values(data || {})[0]?.[0] || 'Error al guardar'
+      toast.error(msg)
+    },
+  })
+
+  // Historial de pagos del alumno
+  const { data: pagosData, refetch: refetchPagos } = useQuery({
+    queryKey: ['pagos-alumno', alumnoInit?.id],
+    enabled: !!alumnoInit?.id && open,
+    queryFn: () => api.get(`/pagos/?alumno=${alumnoInit.id}`).then(r => r.data),
+  })
+  const pagosAlumno = Array.isArray(pagosData) ? pagosData : (pagosData?.results ?? [])
+
+  // Eliminar pago
+  const [confirmDelete, setConfirmDelete] = useState(null)  // id del pago a confirmar
+  const deletePago = useMutation({
+    mutationFn: (id) => api.delete(`/pagos/${id}/`),
+    onSuccess: () => {
+      toast.success('Pago eliminado')
+      setConfirmDelete(null)
+      refetchPagos()
+      qc.invalidateQueries({ queryKey: ['alumnos'] })
+    },
+    onError: () => toast.error('No se pudo eliminar el pago'),
+  })
+
+  // Registrar pago
+  const pagoMutation = useMutation({
+    mutationFn: (data) => api.post('/pagos/', { alumno: alumno.id, ...data }),
+    onSuccess: () => {
+      toast.success(`Pago registrado — ${alumno.nombre_completo}`)
+      qc.invalidateQueries({ queryKey: ['alumnos'] })
+      onClose()
+    },
+    onError: (err) => {
+      const msg = err.response?.data?.non_field_errors?.[0]
+        || err.response?.data?.detail
+        || 'Error al registrar el pago'
+      toast.error(msg)
+    },
+  })
+
+  if (!alumno) return null
+
+  return (
+    <SlidePanel
+      open={open}
+      onClose={onClose}
+      title={alumno.nombre_completo}
+      subtitle={`Sede ${alumno.sede === '107' ? 'Athlon 107' : 'Athlon 24'}`}
+    >
+      <form onSubmit={handleSubmit(d => pagoMutation.mutate(d))} className="space-y-5">
+
+        {/* ── BLOQUE 0: Datos de contacto ─────────────────────────────── */}
+        <div className="card space-y-2">
+          <p className="text-xs font-semibold text-dark-muted uppercase tracking-wider mb-3">
+            Datos de contacto <span className="font-normal normal-case text-dark-muted/60">(clic para editar)</span>
+          </p>
+          {[
+            { label: 'Celular',   field: 'celular',   type: 'tel',   placeholder: 'Ej: 2954123456' },
+            { label: 'Email',     field: 'email',     type: 'email', placeholder: 'Sin email' },
+            { label: 'Instagram', field: 'instagram', type: 'text',  placeholder: '@usuario' },
+          ].map(({ label, field, type, placeholder }) => (
+            <div key={field} className="flex items-center gap-3 min-w-0">
+              <span className="text-xs text-dark-muted w-20 shrink-0">{label}</span>
+              <div className="flex-1 min-w-0">
+                <CampoEditable
+                  label={label}
+                  value={alumno[field]}
+                  type={type}
+                  placeholder={placeholder}
+                  onSave={(val) => patchAlumno.mutate({ [field]: val })}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── BLOQUE 1: Confirmar actividad ───────────────────────────── */}
+        <div className="card space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-dark-muted uppercase tracking-wider">
+              Confirmar actividad
+            </p>
+            <span className={clsx('text-xs font-semibold', ESTADO_COLOR[alumno.estado])}>
+              {alumno.estado}
+            </span>
+          </div>
+
+          {/* Disciplina */}
+          <div>
+            <p className="text-xs text-dark-muted mb-1.5">Disciplina</p>
+            <ChipSelector
+              options={Object.entries(DISC_LABEL).map(([v, l]) => ({ value: v, label: l }))}
+              value={alumno.disciplina}
+              onChange={(v) => patchAlumno.mutate({ disciplina: v })}
+              renderLabel={(val, lbl) => (
+                <span className={clsx(alumno.disciplina === val && DISC_BADGE[val], 'rounded px-1')}>
+                  {lbl}
+                </span>
+              )}
+            />
+          </div>
+
+          {/* Frecuencia */}
+          <div>
+            <p className="text-xs text-dark-muted mb-1.5">Frecuencia</p>
+            <ChipSelector
+              options={(FRECUENCIAS[alumno.disciplina] || ['2x','3x']).map(f => ({ value: f, label: FREQ_LABEL[f] }))}
+              value={alumno.frecuencia}
+              onChange={(v) => patchAlumno.mutate({ frecuencia: v })}
+            />
+          </div>
+
+          {/* Horario */}
+          <div>
+            <p className="text-xs text-dark-muted mb-1.5">Horario</p>
+            <div className="grid grid-cols-4 gap-1.5">
+              {HORARIOS.map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => patchAlumno.mutate({ horario: h })}
+                  className={clsx(
+                    'py-1.5 rounded-lg text-xs font-mono font-medium border transition-all',
+                    alumno.horario === h
+                      ? 'bg-primary-dark border-primary-dark text-white'
+                      : 'border-dark-border text-dark-muted hover:border-primary-dark/50'
+                  )}
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── BLOQUE 2: Registrar pago ────────────────────────────────── */}
+        <div className="card space-y-4">
+          <p className="text-xs font-semibold text-dark-muted uppercase tracking-wider">
+            Registrar pago{watch('mes') ? ` — ${format(new Date(watch('mes') + 'T12:00:00'), 'MMMM yyyy', { locale: es }).replace(/^\w/, c => c.toUpperCase())}` : ''}
+          </p>
+
+          {/* Último pago */}
+          {alumno.ultimo_pago && (
+            <div className="flex items-center justify-between text-xs bg-dark-bg rounded-lg px-3 py-2">
+              <span className="text-dark-muted">Último pago</span>
+              <span className="text-dark-text font-medium">
+                {money(alumno.ultimo_pago.monto)} · {alumno.ultimo_pago.fecha}
+              </span>
+            </div>
+          )}
+
+          {/* Mes */}
+          <div>
+            <label className="block text-xs text-dark-muted mb-1.5">
+              <span className="flex items-center gap-1"><Calendar size={11} /> Mes</span>
+            </label>
+            <select {...register('mes')} className="input text-sm">
+              {meses.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
+
+          {/* Monto + Fecha en fila */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-dark-muted mb-1.5">
+                <span className="flex items-center gap-1"><DollarSign size={11} /> Monto</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-muted text-sm">$</span>
+                <input {...register('monto')} type="number" step="1" placeholder="50000" className="input pl-7 text-sm" />
+              </div>
+              {errors.monto && <p className="text-red-400 text-xs mt-1">{errors.monto.message}</p>}
+            </div>
+            <div>
+              <label className="block text-xs text-dark-muted mb-1.5">
+                <span className="flex items-center gap-1"><Calendar size={11} /> Fecha</span>
+              </label>
+              <input {...register('fecha_pago')} type="date" className="input text-sm" />
+            </div>
+          </div>
+
+          {/* Método */}
+          <div>
+            <label className="block text-xs text-dark-muted mb-1.5">
+              <span className="flex items-center gap-1"><CreditCard size={11} /> Método</span>
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'efectivo',      label: '💵 Efectivo' },
+                { value: 'transferencia', label: '📲 Transf.' },
+                { value: 'debito',        label: '💳 Débito' },
+              ].map(({ value, label }) => (
+                <label key={value} className="cursor-pointer">
+                  <input {...register('metodo')} type="radio" value={value} className="sr-only peer" />
+                  <div className="text-center text-xs py-2 rounded-xl border border-dark-border
+                    text-dark-muted transition-all
+                    peer-checked:bg-primary-dark peer-checked:text-white peer-checked:border-primary-dark
+                    hover:border-primary-dark/50">
+                    {label}
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Comentarios */}
+          <div>
+            <label className="block text-xs text-dark-muted mb-1.5">
+              Comentarios <span className="text-dark-border">(opcional)</span>
+            </label>
+            <textarea
+              {...register('notas')}
+              rows={2}
+              placeholder="Escribir comentario..."
+              className="input text-sm resize-none w-full"
+            />
+          </div>
+        </div>
+
+        {/* ── BLOQUE 3: Historial de pagos ────────────────────────────── */}
+        {pagosAlumno.length > 0 && (
+          <div className="card space-y-2">
+            <p className="text-xs font-semibold text-dark-muted uppercase tracking-wider">
+              Pagos registrados
+            </p>
+            {pagosAlumno.slice(0, 8).map((p) => {
+              const mesLabel = p.mes
+                ? new Date(p.mes + 'T12:00:00').toLocaleString('es-AR', { month: 'long', year: 'numeric' })
+                    .replace(/^\w/, c => c.toUpperCase())
+                : '—'
+              const isConfirming = confirmDelete === p.id
+
+              return (
+                <div key={p.id}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors ${
+                    isConfirming ? 'border-red-700/60 bg-red-950/30' : 'border-dark-border bg-dark-bg'
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-dark-text">{mesLabel}</span>
+                      <span className="text-xs text-dark-muted">
+                        {p.metodo === 'efectivo' ? '💵' : p.metodo === 'transferencia' ? '📲' : '💳'}
+                        {' '}{p.fecha_pago}
+                      </span>
+                    </div>
+                    {p.notas && <p className="text-xs text-dark-muted/70 mt-0.5 truncate">{p.notas}</p>}
+                  </div>
+                  <span className="text-sm font-bold text-green-400 shrink-0">
+                    ${Number(p.monto).toLocaleString('es-AR')}
+                  </span>
+
+                  {isConfirming ? (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-xs text-red-400 flex items-center gap-1">
+                        <AlertTriangle size={11} /> ¿Eliminar?
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => deletePago.mutate(p.id)}
+                        disabled={deletePago.isPending}
+                        className="px-2 py-1 rounded-lg bg-red-700 hover:bg-red-600 text-white text-xs font-medium transition-colors"
+                      >
+                        Sí
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(null)}
+                        className="px-2 py-1 rounded-lg border border-dark-border text-dark-muted hover:text-dark-text text-xs transition-colors"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(p.id)}
+                      className="p-1.5 rounded-lg text-dark-muted hover:text-red-400 hover:bg-red-900/20 transition-colors shrink-0"
+                      title="Eliminar pago"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── Botón confirmar ─────────────────────────────────────────── */}
+        <button
+          type="submit"
+          disabled={pagoMutation.isPending}
+          className="w-full btn-primary flex items-center justify-center gap-2 py-3 text-base"
+        >
+          <Check size={18} />
+          {pagoMutation.isPending ? 'Guardando...' : 'Confirmar pago'}
+        </button>
+
+      </form>
+    </SlidePanel>
+  )
+}

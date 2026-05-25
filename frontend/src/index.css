@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-dark-bg text-dark-text antialiased;
+  }
+
+  /* cmdk */
+  [cmdk-root] { @apply w-full; }
+  [cmdk-group-heading] {
+    @apply px-2 py-1.5 text-xs text-dark-muted uppercase tracking-wider font-medium;
+  }
+  [cmdk-item] { @apply outline-none; }
+
+  ::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-dark-surface;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dark-border rounded-full;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-dark text-white px-4 py-2 rounded-lg font-medium
+           hover:bg-primary-700 active:scale-95 transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply text-dark-muted px-4 py-2 rounded-lg font-medium
+           hover:bg-dark-surface hover:text-dark-text transition-colors duration-150;
+  }
+
+  .card {
+    @apply bg-dark-surface border border-dark-border rounded-xl p-4;
+  }
+
+  .input {
+    @apply bg-dark-bg border border-dark-border rounded-lg px-3 py-2 w-full
+           text-dark-text placeholder-dark-muted
+           focus:outline-none focus:ring-2 focus:ring-primary-dark focus:border-transparent
+           transition-all duration-150;
+  }
+
+  .badge-cf      { @apply bg-blue-900 text-blue-200 text-xs font-semibold px-2 py-0.5 rounded-full; }
+  .badge-hf      { @apply bg-green-900 text-green-200 text-xs font-semibold px-2 py-0.5 rounded-full; }
+  .badge-hyrox   { @apply bg-yellow-900 text-yellow-200 text-xs font-semibold px-2 py-0.5 rounded-full; }
+  .badge-teens   { @apply bg-purple-900 text-purple-200 text-xs font-semibold px-2 py-0.5 rounded-full; }
+  .badge-kids    { @apply bg-pink-900 text-pink-200 text-xs font-semibold px-2 py-0.5 rounded-full; }
+  .badge-temporal{ @apply bg-sky-900 text-sky-200 text-xs font-semibold px-2 py-0.5 rounded-full; }
+
+  .estado-activo  { @apply text-green-400; }
+  .estado-mora    { @apply text-yellow-400; }
+  .estado-baja    { @apply text-orange-400; }
+  .estado-alejado { @apply text-red-400; }
+}
