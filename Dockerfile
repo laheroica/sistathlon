@@ -34,5 +34,5 @@ RUN cd backend && python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
-# Migraciones al arrancar (necesitan DATABASE_URL del entorno)
-CMD ["sh", "-c", "cd backend && python manage.py migrate --noinput && gunicorn sistathlon.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120"]
+# Script de inicio: migrar y luego arrancar gunicorn
+CMD ["sh", "-c", "set -e && echo '==> Migrando base de datos...' && cd backend && python manage.py migrate --noinput && echo '==> Iniciando gunicorn...' && exec gunicorn sistathlon.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120 --log-level info"]
