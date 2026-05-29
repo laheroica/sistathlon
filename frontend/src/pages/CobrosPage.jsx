@@ -348,7 +348,10 @@ export default function CobrosPage() {
     if (freqFilter) list = list.filter(a => a.frecuencia === freqFilter)
     if (busqueda.trim()) {
       const q = busqueda.toLowerCase()
-      list = list.filter(a => a.nombre_completo?.toLowerCase().includes(q))
+      list = list.filter(a =>
+        `${a.nombre} ${a.apellido}`.toLowerCase().includes(q) ||
+        `${a.apellido} ${a.nombre}`.toLowerCase().includes(q)
+      )
     }
     if (tab === 'pendientes') return list.filter(a => !a.pago && a.estado !== 'baja')
     if (tab === 'pagados')    return list.filter(a => a.pago)

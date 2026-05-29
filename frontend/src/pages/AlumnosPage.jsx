@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,6 +10,7 @@ import api from '../lib/api'
 import { money } from '../lib/format'
 import CommandPalette from '../components/ui/CommandPalette'
 import FichaAlumnoPanel from '../components/alumnos/FichaAlumnoPanel'
+import SlidePanel from '../components/ui/SlidePanel'
 
 const TABS = [
   // "Al día" = todos los activos (el estado ya indica que están al corriente)
@@ -169,22 +170,134 @@ function abrirRecordatorio(e, alumno) {
   window.open(`https://wa.me/54${tel}?text=${msg}`, '_blank')
 }
 
-const MSGS_VUELTA = [
-  { label: 'Te extrañamos',  msg: (n) => `Hola ${n}! 🙌 Hace un tiempo que no te vemos por Athlon y te extrañamos. ¿Cómo estás? Si querés retomar, estamos acá para ayudarte a encontrar el plan ideal. ¡Te esperamos!` },
-  { label: 'Promo vuelta',   msg: (n) => `Hola ${n}! 💪 Tenemos una propuesta especial para vos para que vuelvas a entrenar en Athlon. Avisanos si te interesa y te contamos los detalles!` },
-  { label: 'Consulta',       msg: (n) => `Hola ${n}! ¿Cómo estás? Solo pasamos a saludarte y ver si tenés alguna consulta o si puedo ayudarte en algo. Un abrazo del equipo Athlon 🏋️` },
-]
+const TEMPLATES_MSG = (a) => {
+  const dias   = a.dias_sin_pago >= 9999 ? 'hace mucho tiempo' : `hace ${a.dias_sin_pago} días`
+  const monto  = a.ultimo_pago ? `$${Number(a.ultimo_pago.monto).toLocaleString('es-AR')}` : ''
+  const cuota  = a.cuota_actual ? `$${Number(a.cuota_actual).toLocaleString('es-AR')}` : ''
+  return [
+    {
+      label: 'Cuota pendiente',
+      texto: `Hola ${a.nombre}! 👋 Te escribimos desde Athlon para avisarte que tu cuota de ${MES_ACTUAL} figura pendiente${monto ? ` (último pago: ${monto})` : ''}. Cuando puedas acercate o avisanos y lo coordinamos. 💪`,
+    },
+    {
+      label: 'Te extrañamos',
+      texto: `Hola ${a.nombre}! 🙌 Hace un tiempo que no te vemos por Athlon y te extrañamos. ¿Cómo estás? Si querés retomar, estamos acá para ayudarte a encontrar el plan ideal. ¡Te esperamos!`,
+    },
+    {
+      label: 'Volver a entrenar',
+      texto: `Hola ${a.nombre}! 💪 Nos acordamos de vos y queremos saber cómo estás. Si tenés ganas de volver a entrenar tenemos opciones para adaptarnos a tu ritmo. ¡Avisanos!`,
+    },
+    {
+      label: 'Personalizado',
+      texto: '',
+    },
+  ]
+}
 
-function AlumnoRow({ alumno, onPago, esImpago, esAlejado }) {
-  const [showMsgs, setShowMsgs] = useState(false)
-  const ultimoPago = alumno.ultimo_pago
+function PanelMensaje({ alumno, open, onClose }) {
+  const templates = alumno ? TEMPLATES_MSG(alumno) : []
+  const [selIdx, setSelIdx] = useState(0)
+  const [texto, setTexto] = useState('')
 
-  function abrirWA(e) {
-    e.stopPropagation()
-    const tel = alumno.celular?.replace(/\D/g, '')
-    if (!tel) return
-    window.open(`https://wa.me/54${tel}`, '_blank')
+  useEffect(() => {
+    if (!alumno) return
+    const t = TEMPLATES_MSG(alumno)
+    setSelIdx(0)
+    setTexto(t[0].texto)
+  }, [alumno])
+
+  function seleccionarTemplate(idx) {
+    setSelIdx(idx)
+    setTexto(templates[idx].texto)
   }
+
+  function enviarWA() {
+    if (!alumno?.celular || !texto.trim()) return
+    const tel = alumno.celular.replace(/\D/g, '')
+    window.open(`https://wa.me/54${tel}?text=${encodeURIComponent(texto)}`, '_blank')
+  }
+
+  if (!alumno) return null
+
+  const diasLabel = alumno.dias_sin_pago >= 9999 ? 'Sin pago registrado' : `${alumno.dias_sin_pago} días sin pagar`
+  const montoLabel = alumno.ultimo_pago ? `Último pago: $${Number(alumno.ultimo_pago.monto).toLocaleString('es-AR')} · ${alumno.ultimo_pago.fecha}` : 'Sin pagos'
+
+  return (
+    <SlidePanel open={open} onClose={onClose} title={`Mensaje a ${alumno.nombre_completo}`}>
+      <div className="space-y-4 p-1">
+        {/* Info del alumno */}
+        <div className="bg-dark-bg rounded-xl border border-dark-border p-3 space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-dark-muted">Estado</span>
+            <span className={clsx('font-semibold', ESTADO_DOT[alumno.estado] && 'capitalize')}>{alumno.estado}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-dark-muted">Días sin pago</span>
+            <span className={clsx('font-semibold',
+              alumno.dias_sin_pago >= 90 ? 'text-red-400' :
+              alumno.dias_sin_pago >= 30 ? 'text-yellow-400' : 'text-green-400'
+            )}>{diasLabel}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-dark-muted">Pago</span>
+            <span className="text-dark-text">{montoLabel}</span>
+          </div>
+          {alumno.cuota_actual > 0 && (
+            <div className="flex justify-between">
+              <span className="text-dark-muted">Cuota</span>
+              <span className="text-dark-text">${Number(alumno.cuota_actual).toLocaleString('es-AR')}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Selector de plantilla */}
+        <div>
+          <p className="text-xs text-dark-muted mb-2 font-medium uppercase tracking-wide">Elegí el mensaje</p>
+          <div className="grid grid-cols-2 gap-2">
+            {templates.map((t, i) => (
+              <button key={i} type="button"
+                onClick={() => seleccionarTemplate(i)}
+                className={clsx(
+                  'py-2 px-3 rounded-xl text-xs font-medium border transition-colors text-left',
+                  selIdx === i
+                    ? 'bg-indigo-700 border-indigo-500 text-white'
+                    : 'bg-dark-bg border-dark-border text-dark-muted hover:text-dark-text'
+                )}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Texto del mensaje */}
+        <div>
+          <p className="text-xs text-dark-muted mb-1.5 font-medium uppercase tracking-wide">Texto del mensaje</p>
+          <textarea
+            rows={6}
+            value={texto}
+            onChange={e => setTexto(e.target.value)}
+            className="input w-full resize-none text-sm leading-relaxed"
+            placeholder="Escribí tu mensaje..."
+          />
+        </div>
+
+        {/* Botón enviar */}
+        <button
+          type="button"
+          onClick={enviarWA}
+          disabled={!texto.trim() || !alumno.celular}
+          className="w-full btn-primary flex items-center justify-center gap-2 py-3"
+        >
+          <MessageCircle size={16} />
+          {alumno.celular ? 'Abrir WhatsApp' : 'Sin número de celular'}
+        </button>
+      </div>
+    </SlidePanel>
+  )
+}
+
+function AlumnoRow({ alumno, onPago, onMensaje, esImpago }) {
+  const ultimoPago = alumno.ultimo_pago
 
   return (
     <motion.div
@@ -227,9 +340,7 @@ function AlumnoRow({ alumno, onPago, esImpago, esAlejado }) {
 
       {/* Días sin pagar — solo si no es activo */}
       {alumno.estado !== 'activo' && (
-        <div className={clsx(
-          'text-right shrink-0 hidden sm:block w-16',
-        )}>
+        <div className="text-right shrink-0 hidden sm:block w-16">
           <div className={clsx(
             'text-sm font-bold',
             alumno.dias_sin_pago >= 90 ? 'text-red-400' :
@@ -252,8 +363,19 @@ function AlumnoRow({ alumno, onPago, esImpago, esAlejado }) {
         </button>
       )}
 
-      {/* Acciones — aparecen al hover */}
-      <div className="flex gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity relative">
+      {/* Botón WhatsApp — siempre visible si tiene celular */}
+      {alumno.celular && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onMensaje(alumno) }}
+          title="Enviar mensaje por WhatsApp"
+          className="p-1.5 rounded-lg bg-green-900/20 hover:bg-green-900/50 text-green-400 border border-green-800/30 transition-colors shrink-0"
+        >
+          <MessageCircle size={14} />
+        </button>
+      )}
+
+      {/* Acciones adicionales — aparecen al hover */}
+      <div className="flex gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={(e) => { e.stopPropagation(); onPago(alumno) }}
           title="Registrar pago"
@@ -261,40 +383,6 @@ function AlumnoRow({ alumno, onPago, esImpago, esAlejado }) {
         >
           <DollarSign size={14} />
         </button>
-        {alumno.celular && !esAlejado && (
-          <button onClick={abrirWA} title="WhatsApp"
-            className="p-1.5 rounded-lg hover:bg-green-900/40 text-green-400 transition-colors">
-            <MessageCircle size={14} />
-          </button>
-        )}
-        {alumno.celular && esAlejado && (
-          <div className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowMsgs(v => !v) }}
-              title="Enviar mensaje"
-              className="p-1.5 rounded-lg hover:bg-indigo-900/40 text-indigo-400 transition-colors"
-            >
-              <MessageCircle size={14} />
-            </button>
-            {showMsgs && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 bottom-8 z-50 bg-dark-surface border border-dark-border rounded-xl shadow-xl p-2 flex flex-col gap-1 w-44"
-              >
-                {MSGS_VUELTA.map(({ label, msg }) => {
-                  const tel = alumno.celular.replace(/\D/g, '')
-                  const link = `https://wa.me/54${tel}?text=${encodeURIComponent(msg(alumno.nombre))}`
-                  return (
-                    <a key={label} href={link} target="_blank" rel="noreferrer"
-                      onClick={() => setShowMsgs(false)}
-                      className="px-3 py-1.5 text-xs rounded-lg hover:bg-indigo-700/40 text-dark-text transition-colors"
-                    >{label}</a>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
         {alumno.instagram && (
           <a
             href={`https://instagram.com/${alumno.instagram.replace('@', '')}`}
@@ -312,7 +400,7 @@ function AlumnoRow({ alumno, onPago, esImpago, esAlejado }) {
   )
 }
 
-function GrupoHorario({ hora, alumnos, onPago, esImpago }) {
+function GrupoHorario({ hora, alumnos, onPago, onMensaje, esImpago }) {
   const [collapsed, setCollapsed] = useState(false)
 
   const porDisc = alumnos.reduce((acc, a) => {
@@ -351,7 +439,7 @@ function GrupoHorario({ hora, alumnos, onPago, esImpago }) {
             className="overflow-hidden mt-1 space-y-1 pl-2"
           >
             {alumnos.map((a) => (
-              <AlumnoRow key={a.id} alumno={a} onPago={onPago} esImpago={esImpago} esAlejado={['baja','alejado'].includes(a.estado)} />
+              <AlumnoRow key={a.id} alumno={a} onPago={onPago} onMensaje={onMensaje} esImpago={esImpago} />
             ))}
           </motion.div>
         )}
@@ -371,6 +459,7 @@ export default function AlumnosPage() {
   const [rangoDias, setRangoDias]   = useState('todos')
   const [cmdOpen, setCmdOpen]       = useState(false)
   const [pagoAlumno, setPagoAlumno] = useState(null)
+  const [msgAlumno, setMsgAlumno]   = useState(null)
   const [mesPago, setMesPago]       = useState(MESES_RECIENTES[0].value)
 
   const tabConfig = TABS.find((t) => t.id === tabActiva)
@@ -439,7 +528,8 @@ export default function AlumnosPage() {
   const gruposPagos = agruparPagosPorHorario(pagos)
   const totalPagos  = pagos.reduce((s, p) => s + Number(p.monto), 0)
 
-  const abrirPago = useCallback((alumno) => setPagoAlumno(alumno), [])
+  const abrirPago    = useCallback((alumno) => setPagoAlumno(alumno), [])
+  const abrirMensaje = useCallback((alumno) => setMsgAlumno(alumno), [])
 
   function exportarCSV() {
     const filas = esPorMes ? pagos : alumnos
@@ -748,7 +838,7 @@ export default function AlumnosPage() {
                 transition={{ duration: 0.15 }}
               >
                 {grupos.map(([hora, alumnosGrupo]) => (
-                  <GrupoHorario key={hora} hora={hora} alumnos={alumnosGrupo} onPago={abrirPago} esImpago={tabActiva === 'mora'} />
+                  <GrupoHorario key={hora} hora={hora} alumnos={alumnosGrupo} onPago={abrirPago} onMensaje={abrirMensaje} esImpago={tabActiva === 'mora'} />
                 ))}
               </motion.div>
             </AnimatePresence>
@@ -768,6 +858,13 @@ export default function AlumnosPage() {
         alumno={pagoAlumno}
         open={!!pagoAlumno}
         onClose={() => setPagoAlumno(null)}
+      />
+
+      {/* Panel de mensajes WhatsApp */}
+      <PanelMensaje
+        alumno={msgAlumno}
+        open={!!msgAlumno}
+        onClose={() => setMsgAlumno(null)}
       />
     </>
   )

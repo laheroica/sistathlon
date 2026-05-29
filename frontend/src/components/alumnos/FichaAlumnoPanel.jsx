@@ -130,6 +130,15 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
   const [alumno, setAlumno] = useState(alumnoInit)
   useEffect(() => { setAlumno(alumnoInit) }, [alumnoInit])
 
+  // Cambios pendientes de actividad (disciplina, frecuencia, horario, combo)
+  const [pendiente, setPendiente] = useState({})
+  useEffect(() => { setPendiente({}) }, [alumnoInit])
+  const hayPendiente = Object.keys(pendiente).length > 0
+  function setPend(field, value) {
+    setPendiente(prev => ({ ...prev, [field]: value }))
+    setAlumno(prev => ({ ...prev, [field]: value }))  // reflejo visual inmediato
+  }
+
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm({
     resolver: zodResolver(pagoSchema),
     defaultValues: {
@@ -173,6 +182,7 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
     mutationFn: (data) => api.patch(`/alumnos/${alumno.id}/`, data),
     onSuccess: (res) => {
       setAlumno(prev => ({ ...prev, ...res.data }))
+      setPendiente({})
       qc.invalidateQueries({ queryKey: ['alumnos'] })
       toast.success('Guardado')
     },
@@ -275,7 +285,7 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
             <ChipSelector
               options={Object.entries(DISC_LABEL).map(([v, l]) => ({ value: v, label: l }))}
               value={alumno.disciplina}
-              onChange={(v) => patchAlumno.mutate({ disciplina: v })}
+              onChange={(v) => { setPend('disciplina', v); setPend('frecuencia', FRECUENCIAS[v]?.[0] || '') }}
               renderLabel={(val, lbl) => (
                 <span className={clsx(alumno.disciplina === val && DISC_BADGE[val], 'rounded px-1')}>
                   {lbl}
@@ -291,7 +301,7 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
               <ChipSelector
                 options={COMBO_OPTS.filter(o => o.value === '' || o.value.includes(alumno.disciplina.toLowerCase()))}
                 value={alumno.combo || ''}
-                onChange={(v) => patchAlumno.mutate({ combo: v })}
+                onChange={(v) => setPend('combo', v)}
               />
             </div>
           )}
@@ -302,7 +312,7 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
             <ChipSelector
               options={(FRECUENCIAS[alumno.disciplina] || ['2x','3x']).map(f => ({ value: f, label: FREQ_LABEL[f] }))}
               value={alumno.frecuencia}
-              onChange={(v) => patchAlumno.mutate({ frecuencia: v })}
+              onChange={(v) => setPend('frecuencia', v)}
             />
           </div>
 
@@ -314,7 +324,7 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
                 <button
                   key={h}
                   type="button"
-                  onClick={() => patchAlumno.mutate({ horario: h })}
+                  onClick={() => setPend('horario', h)}
                   className={clsx(
                     'py-1.5 rounded-lg text-xs font-mono font-medium border transition-all',
                     alumno.horario === h
@@ -327,6 +337,18 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
               ))}
             </div>
           </div>
+          {/* Botón guardar actividad */}
+          {hayPendiente && (
+            <button
+              type="button"
+              onClick={() => patchAlumno.mutate(pendiente)}
+              disabled={patchAlumno.isPending}
+              className="w-full btn-primary flex items-center justify-center gap-2 py-2.5"
+            >
+              <Check size={15} />
+              {patchAlumno.isPending ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+          )}
         </div>
 
         {/* ── BLOQUE 2: Registrar pago ────────────────────────────────── */}
