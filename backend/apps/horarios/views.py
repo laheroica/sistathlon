@@ -1,9 +1,27 @@
 from datetime import date
 from rest_framework import generics, status
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .models import HorarioMaestro, HorarioReal, Feriado
 from .serializers import HorarioMaestroSerializer, HorarioRealSerializer, FeriadoSerializer
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def horarios_disponibles(request):
+    """Devuelve lista de horas únicas activas para una sede y una o más disciplinas."""
+    sede        = request.query_params.get('sede', '')
+    disciplinas = request.query_params.getlist('disciplina')   # puede ser múltiple
+
+    qs = HorarioMaestro.objects.filter(activo=True)
+    if sede:
+        qs = qs.filter(sede=sede)
+    if disciplinas:
+        qs = qs.filter(disciplina__in=disciplinas)
+
+    horas = sorted(set(qs.values_list('hora', flat=True)))
+    return Response([str(h)[:5] for h in horas])   # ["06:00", "07:00", ...]
 
 
 class HorarioMaestroListCreateView(generics.ListCreateAPIView):

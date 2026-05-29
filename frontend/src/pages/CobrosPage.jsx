@@ -300,6 +300,7 @@ export default function CobrosPage() {
   const [discFilter, setDiscFilter] = useState('')
   const [freqFilter, setFreqFilter] = useState('')
   const [selected, setSelected] = useState(null)
+  const [busqueda, setBusqueda] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['cobros-resumen', mes],
@@ -345,12 +346,16 @@ export default function CobrosPage() {
     let list = alumnosFiltradosSede
     if (discFilter) list = list.filter(a => a.disciplina === discFilter)
     if (freqFilter) list = list.filter(a => a.frecuencia === freqFilter)
+    if (busqueda.trim()) {
+      const q = busqueda.toLowerCase()
+      list = list.filter(a => a.nombre_completo?.toLowerCase().includes(q))
+    }
     if (tab === 'pendientes') return list.filter(a => !a.pago && a.estado !== 'baja')
     if (tab === 'pagados')    return list.filter(a => a.pago)
     if (tab === 'deuda')      return list.filter(a => a.pago?.deuda > 0)
     if (tab === 'day')        return list.filter(a => a.pertenencia !== 'athlon')
     return list
-  }, [alumnosFiltradosSede, tab, discFilter, freqFilter])
+  }, [alumnosFiltradosSede, tab, discFilter, freqFilter, busqueda])
 
   function exportarCSV() {
     if (!filtrados.length) return
@@ -401,7 +406,14 @@ export default function CobrosPage() {
           <h1 className="text-2xl font-bold text-dark-text">Cobros</h1>
           <p className="text-sm text-dark-muted mt-0.5">Registro de cuotas mensuales</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="text"
+            placeholder="Buscar alumno..."
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            className="input text-sm px-3 py-2 w-44"
+          />
           <select
             value={sedeFilter}
             onChange={e => { setSedeFilter(e.target.value); setDiscFilter(''); setFreqFilter('') }}

@@ -153,6 +153,21 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
     }
   }, [alumnoInit, reset])
 
+  // Horarios disponibles según sede + disciplina (+ combo Hyrox si aplica)
+  const disciplinasHorario = [alumno?.disciplina].filter(Boolean)
+  if (alumno?.combo === 'hyrox_cf' || alumno?.combo === 'hyrox_hf') disciplinasHorario.push('HX')
+  const { data: horariosDisponibles } = useQuery({
+    queryKey: ['horarios-disponibles', alumno?.sede, disciplinasHorario],
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (alumno?.sede) params.append('sede', alumno.sede)
+      disciplinasHorario.forEach(d => params.append('disciplina', d))
+      return api.get(`/horarios/disponibles/?${params}`).then(r => r.data)
+    },
+    enabled: !!alumno?.sede && !!alumno?.disciplina,
+  })
+  const horariosGrid = horariosDisponibles || HORARIOS
+
   // PATCH campo del alumno
   const patchAlumno = useMutation({
     mutationFn: (data) => api.patch(`/alumnos/${alumno.id}/`, data),
@@ -295,7 +310,7 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
           <div>
             <p className="text-xs text-dark-muted mb-1.5">Horario</p>
             <div className="grid grid-cols-4 gap-1.5">
-              {HORARIOS.map((h) => (
+              {horariosGrid.map((h) => (
                 <button
                   key={h}
                   type="button"

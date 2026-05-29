@@ -169,7 +169,14 @@ function abrirRecordatorio(e, alumno) {
   window.open(`https://wa.me/54${tel}?text=${msg}`, '_blank')
 }
 
-function AlumnoRow({ alumno, onPago, esImpago }) {
+const MSGS_VUELTA = [
+  { label: 'Te extrañamos',  msg: (n) => `Hola ${n}! 🙌 Hace un tiempo que no te vemos por Athlon y te extrañamos. ¿Cómo estás? Si querés retomar, estamos acá para ayudarte a encontrar el plan ideal. ¡Te esperamos!` },
+  { label: 'Promo vuelta',   msg: (n) => `Hola ${n}! 💪 Tenemos una propuesta especial para vos para que vuelvas a entrenar en Athlon. Avisanos si te interesa y te contamos los detalles!` },
+  { label: 'Consulta',       msg: (n) => `Hola ${n}! ¿Cómo estás? Solo pasamos a saludarte y ver si tenés alguna consulta o si puedo ayudarte en algo. Un abrazo del equipo Athlon 🏋️` },
+]
+
+function AlumnoRow({ alumno, onPago, esImpago, esAlejado }) {
+  const [showMsgs, setShowMsgs] = useState(false)
   const ultimoPago = alumno.ultimo_pago
 
   function abrirWA(e) {
@@ -246,7 +253,7 @@ function AlumnoRow({ alumno, onPago, esImpago }) {
       )}
 
       {/* Acciones — aparecen al hover */}
-      <div className="flex gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity relative">
         <button
           onClick={(e) => { e.stopPropagation(); onPago(alumno) }}
           title="Registrar pago"
@@ -254,11 +261,39 @@ function AlumnoRow({ alumno, onPago, esImpago }) {
         >
           <DollarSign size={14} />
         </button>
-        {alumno.celular && (
+        {alumno.celular && !esAlejado && (
           <button onClick={abrirWA} title="WhatsApp"
             className="p-1.5 rounded-lg hover:bg-green-900/40 text-green-400 transition-colors">
             <MessageCircle size={14} />
           </button>
+        )}
+        {alumno.celular && esAlejado && (
+          <div className="relative">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowMsgs(v => !v) }}
+              title="Enviar mensaje"
+              className="p-1.5 rounded-lg hover:bg-indigo-900/40 text-indigo-400 transition-colors"
+            >
+              <MessageCircle size={14} />
+            </button>
+            {showMsgs && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="absolute right-0 bottom-8 z-50 bg-dark-surface border border-dark-border rounded-xl shadow-xl p-2 flex flex-col gap-1 w-44"
+              >
+                {MSGS_VUELTA.map(({ label, msg }) => {
+                  const tel = alumno.celular.replace(/\D/g, '')
+                  const link = `https://wa.me/54${tel}?text=${encodeURIComponent(msg(alumno.nombre))}`
+                  return (
+                    <a key={label} href={link} target="_blank" rel="noreferrer"
+                      onClick={() => setShowMsgs(false)}
+                      className="px-3 py-1.5 text-xs rounded-lg hover:bg-indigo-700/40 text-dark-text transition-colors"
+                    >{label}</a>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         )}
         {alumno.instagram && (
           <a
@@ -316,7 +351,7 @@ function GrupoHorario({ hora, alumnos, onPago, esImpago }) {
             className="overflow-hidden mt-1 space-y-1 pl-2"
           >
             {alumnos.map((a) => (
-              <AlumnoRow key={a.id} alumno={a} onPago={onPago} esImpago={esImpago} />
+              <AlumnoRow key={a.id} alumno={a} onPago={onPago} esImpago={esImpago} esAlejado={['baja','alejado'].includes(a.estado)} />
             ))}
           </motion.div>
         )}
