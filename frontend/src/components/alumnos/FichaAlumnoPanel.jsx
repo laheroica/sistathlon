@@ -29,6 +29,11 @@ const FRECUENCIAS = {
 }
 const FREQ_LABEL = { '2x': '2×/sem', '3x': '3×/sem', '5x': '5×/sem', libre: 'Libre' }
 const HORARIOS   = ['06:00','07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00']
+const COMBO_OPTS = [
+  { value: '',         label: 'Sin combo' },
+  { value: 'hyrox_cf', label: '+ Hyrox' },
+  { value: 'hyrox_hf', label: '+ Hyrox (HF)' },
+]
 
 function mesOptions() {
   const opts = []
@@ -263,6 +268,18 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
               )}
             />
           </div>
+
+          {/* Combo (solo para CF y HF) */}
+          {['CF','HF'].includes(alumno.disciplina) && (
+            <div>
+              <p className="text-xs text-dark-muted mb-1.5">Combo</p>
+              <ChipSelector
+                options={COMBO_OPTS.filter(o => o.value === '' || o.value.includes(alumno.disciplina.toLowerCase()))}
+                value={alumno.combo || ''}
+                onChange={(v) => patchAlumno.mutate({ combo: v })}
+              />
+            </div>
+          )}
 
           {/* Frecuencia */}
           <div>
