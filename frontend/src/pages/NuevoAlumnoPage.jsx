@@ -47,6 +47,7 @@ export default function NuevoAlumnoPage() {
   const [cuotaInfo, setCuotaInfo]     = useState(null)
   const [calculando, setCalculando]   = useState(false)
   const [errorCuota, setErrorCuota]   = useState('')
+  const [errorPaso, setErrorPaso]     = useState('')
   const [alumnoCreado, setAlumnoCreado] = useState(null)   // alumno recién guardado
   const [abrirPago, setAbrirPago]     = useState(false)    // abrir panel de pago post-alta
 
@@ -82,8 +83,20 @@ export default function NuevoAlumnoPage() {
   })
 
   function siguiente() {
-    // Solo auto-calcula si NO hay precio especial ingresado manualmente
-    if (paso === 1 && form.disciplina && form.frecuencia && !form.precio_especial) calcular()
+    setErrorPaso('')
+    // Validaciones paso 0
+    if (paso === 0) {
+      if (!form.nombre || !form.apellido) return setErrorPaso('Completá nombre y apellido.')
+      if (!form.dni)  return setErrorPaso('El DNI es obligatorio.')
+      if (!form.sede) return setErrorPaso('Seleccioná una sede.')
+    }
+    // Validaciones paso 1
+    if (paso === 1) {
+      if (!form.disciplina)  return setErrorPaso('Seleccioná una disciplina.')
+      if (!form.frecuencia)  return setErrorPaso('Seleccioná una frecuencia.')
+      if (!form.cuota_actual || form.cuota_actual <= 0) return setErrorPaso('Calculá la cuota antes de continuar.')
+      if (!form.precio_especial) calcular()
+    }
     setPaso((p) => Math.min(p + 1, 2))
   }
 
@@ -432,13 +445,23 @@ export default function NuevoAlumnoPage() {
             ))}
             {mutation.error && (
               <p className="text-red-400 text-sm mt-2">
-                {mutation.error.response?.data?.detail || 'Error al guardar.'}
+                {mutation.error.response?.data?.detail ||
+                  (mutation.error.response?.data
+                    ? Object.entries(mutation.error.response.data)
+                        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+                        .join(' | ')
+                    : 'Error al guardar.')}
               </p>
             )}
           </div>
         )}
 
         {/* Navegación */}
+        {errorPaso && (
+          <p className="text-red-400 text-sm bg-red-950/50 border border-red-800 rounded-lg px-3 py-2">
+            {errorPaso}
+          </p>
+        )}
         <div className="flex justify-between pt-2">
           <button onClick={anterior} disabled={paso === 0} className="btn-ghost flex items-center gap-2">
             <ArrowLeft size={16} /> Anterior
