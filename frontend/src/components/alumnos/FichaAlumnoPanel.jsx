@@ -239,16 +239,19 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
       open={open}
       onClose={onClose}
       title={alumno.nombre_completo}
-      subtitle={`Sede ${alumno.sede === '107' ? 'Athlon 107' : 'Athlon 24'}`}
+      subtitle={`Sede ${alumno.sede === '107' ? 'Athlon 107' : alumno.sede === '24' ? 'Athlon 24' : alumno.sede}`}
     >
       <form onSubmit={handleSubmit(d => pagoMutation.mutate(d))} className="space-y-5">
 
-        {/* ── BLOQUE 0: Datos de contacto ─────────────────────────────── */}
+        {/* ── BLOQUE 0: Datos personales ──────────────────────────────── */}
         <div className="card space-y-2">
           <p className="text-xs font-semibold text-dark-muted uppercase tracking-wider mb-3">
-            Datos de contacto <span className="font-normal normal-case text-dark-muted/60">(clic para editar)</span>
+            Datos del alumno <span className="font-normal normal-case text-dark-muted/60">(clic para editar)</span>
           </p>
           {[
+            { label: 'Nombre',    field: 'nombre',    type: 'text',  placeholder: 'Nombre' },
+            { label: 'Apellido',  field: 'apellido',  type: 'text',  placeholder: 'Apellido' },
+            { label: 'DNI',       field: 'dni',       type: 'text',  placeholder: 'Sin DNI' },
             { label: 'Celular',   field: 'celular',   type: 'tel',   placeholder: 'Ej: 2954123456' },
             { label: 'Email',     field: 'email',     type: 'email', placeholder: 'Sin email' },
             { label: 'Instagram', field: 'instagram', type: 'text',  placeholder: '@usuario' },
@@ -270,13 +273,40 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
 
         {/* ── BLOQUE 1: Confirmar actividad ───────────────────────────── */}
         <div className="card space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-dark-muted uppercase tracking-wider">
-              Confirmar actividad
-            </p>
-            <span className={clsx('text-xs font-semibold', ESTADO_COLOR[alumno.estado])}>
-              {alumno.estado}
-            </span>
+          <p className="text-xs font-semibold text-dark-muted uppercase tracking-wider">
+            Confirmar actividad
+          </p>
+
+          {/* Sede */}
+          <div>
+            <p className="text-xs text-dark-muted mb-1.5">Sede</p>
+            <ChipSelector
+              options={[
+                { value: '107', label: 'Athlon 107' },
+                { value: '24',  label: 'Athlon 24' },
+              ]}
+              value={alumno.sede}
+              onChange={(v) => setPend('sede', v)}
+            />
+          </div>
+
+          {/* Estado */}
+          <div>
+            <p className="text-xs text-dark-muted mb-1.5">Estado</p>
+            <ChipSelector
+              options={[
+                { value: 'activo',   label: 'Activo' },
+                { value: 'mora',     label: 'Impago' },
+                { value: 'temporal', label: 'Temporal' },
+                { value: 'alejado',  label: 'Alejado' },
+                { value: 'baja',     label: 'Baja' },
+              ]}
+              value={alumno.estado}
+              onChange={(v) => setPend('estado', v)}
+              renderLabel={(val, lbl) => (
+                <span className={clsx(alumno.estado === val && ESTADO_COLOR[val])}>{lbl}</span>
+              )}
+            />
           </div>
 
           {/* Disciplina */}
