@@ -48,7 +48,7 @@ export default function RegistrarPagoPanel({ alumno, open, onClose }) {
   const [filas, setFilas]       = useState([filaVacia()])
   const [fechaPago, setFechaPago] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [metodo, setMetodo]     = useState('efectivo')
-  const [nota, setNota]         = useState('')
+  const [notas: nota, setNota]         = useState('')
 
   // Resetear cuando cambia el alumno o se abre el panel
   useEffect(() => {
@@ -87,7 +87,7 @@ export default function RegistrarPagoPanel({ alumno, open, onClose }) {
           monto:      parseFloat(fila.monto),
           fecha_pago: fechaPago,
           metodo,
-          nota,
+          notas: nota,
         })
         resultados.push(r.data)
       }
@@ -106,9 +106,17 @@ export default function RegistrarPagoPanel({ alumno, open, onClose }) {
       onClose()
     },
     onError: (err) => {
-      const msg = err.response?.data?.non_field_errors?.[0]
-        || err.response?.data?.detail
-        || 'Error al registrar el pago'
+      const data = err.response?.data
+      let msg = 'Error al registrar el pago'
+      if (data) {
+        if (data.non_field_errors) msg = data.non_field_errors[0]
+        else if (data.detail) msg = data.detail
+        else {
+          // field-level errors
+          const firstField = Object.keys(data)[0]
+          if (firstField) msg = `${firstField}: ${[].concat(data[firstField])[0]}`
+        }
+      }
       toast.error(msg)
     },
   })
