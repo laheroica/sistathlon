@@ -26,18 +26,7 @@ class PagoSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        alumno = data.get('alumno')
         mes = data.get('mes')
-        instance = self.instance
-
-        if alumno and mes:
-            qs = Pago.objects.filter(alumno=alumno, mes=mes)
-            if instance:
-                qs = qs.exclude(pk=instance.pk)
-            if qs.exists():
-                raise serializers.ValidationError(
-                    f"Ya existe un pago registrado para {alumno.nombre_completo} en ese mes."
-                )
 
         # Normalizar mes al primer día
         if mes and mes.day != 1:

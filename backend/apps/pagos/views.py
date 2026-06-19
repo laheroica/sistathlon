@@ -39,7 +39,20 @@ class PagoListCreateView(generics.ListCreateAPIView):
         return ctx
 
     def perform_create(self, serializer):
-        pago = serializer.save()
+        alumno = serializer.validated_data.get('alumno')
+        mes = serializer.validated_data.get('mes')
+        existing = Pago.objects.filter(alumno=alumno, mes=mes).first()
+        if existing:
+            # Actualizar pago existente en lugar de crear uno nuevo
+            for field, value in serializer.validated_data.items():
+                setattr(existing, field, value)
+            request = self.request
+            if request and request.user.is_authenticated:
+                existing.registrado_por = request.user
+            existing.save()
+            pago = existing
+        else:
+            pago = serializer.save()
         _actualizar_estado(pago.alumno)
 
 
