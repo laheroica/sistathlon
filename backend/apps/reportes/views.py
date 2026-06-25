@@ -156,13 +156,13 @@ def personalizado(request):
             'alumnos': serializar_alumnos(qs, pagos_por_alumno, 'horario'),
         })
 
-    # Grupos "combo": ambas disciplinas del combo están seleccionadas, solo quienes pagaron el mes
+    # Grupos "combo": alguna disciplina del combo está seleccionada, solo quienes pagaron el mes
     combo_disciplinas = {
         ComboTipo.HYROX_CF: {'HX', 'CF'},
         ComboTipo.HYROX_HF: {'HX', 'HF'},
     }
     for combo_codigo, disc_req in combo_disciplinas.items():
-        if disc_req.issubset(codigos_set):
+        if disc_req & codigos_set:
             qs = base_qs.filter(combo=combo_codigo, id__in=pagadores_ids)
             ids = list(qs.values_list('id', flat=True))
             if ids:
