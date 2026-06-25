@@ -127,15 +127,17 @@ def personalizado(request):
     grupos = []
     ids_totales = set()
 
-    def serializar_alumnos(qs, pagos_por_alumno):
+    def serializar_alumnos(qs, pagos_por_alumno, campo_horario='horario'):
+        alumnos = list(qs.order_by('sede', 'apellido', 'nombre'))
         return [
             {
                 'id': a.id,
                 'nombre': a.nombre_completo,
                 'sede': a.sede,
+                'horario': getattr(a, campo_horario, '') or '',
                 'monto_pagado': float(pagos_por_alumno.get(a.id, 0)),
             }
-            for a in qs.order_by('apellido', 'nombre')
+            for a in alumnos
         ]
 
     # Grupos "puros": disciplina seleccionada sin combo, solo quienes pagaron el mes
@@ -151,7 +153,7 @@ def personalizado(request):
             'label': nombres.get(cod, cod),
             'tipo': 'puro',
             'cantidad': len(ids),
-            'alumnos': serializar_alumnos(qs, pagos_por_alumno),
+            'alumnos': serializar_alumnos(qs, pagos_por_alumno, 'horario'),
         })
 
     # Grupos "combo": ambas disciplinas del combo están seleccionadas, solo quienes pagaron el mes
@@ -173,7 +175,7 @@ def personalizado(request):
                 'label': f'Combo {label}',
                 'tipo': 'combo',
                 'cantidad': len(ids),
-                'alumnos': serializar_alumnos(qs, pagos_por_alumno),
+                'alumnos': serializar_alumnos(qs, pagos_por_alumno, 'horario_combo'),
             })
 
     total_cobrado = Pago.objects.filter(

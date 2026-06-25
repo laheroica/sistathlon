@@ -182,7 +182,9 @@ function ReportePersonalizado() {
                             <div key={a.id} className="flex items-center justify-between text-xs py-1.5">
                               <span className="text-dark-text">{a.nombre}</span>
                               <div className="flex items-center gap-3">
-                                <span className="text-dark-muted">Sede {a.sede}</span>
+                                <span className="text-dark-muted">
+                                  Sede {a.sede}{a.horario ? ` | ${a.horario}` : ''}
+                                </span>
                                 <span className={clsx('font-medium', a.monto_pagado > 0 ? 'text-green-400' : 'text-dark-muted')}>
                                   {a.monto_pagado > 0 ? fmtMoney(a.monto_pagado) : 'Sin pago'}
                                 </span>
