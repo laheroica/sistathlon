@@ -120,6 +120,10 @@ def personalizado(request):
     if sede:
         base_qs = base_qs.filter(sede=sede)
 
+    pagadores_ids = set(
+        Pago.objects.filter(mes=mes).values_list('alumno_id', flat=True)
+    )
+
     grupos = []
     ids_totales = set()
 
@@ -134,9 +138,9 @@ def personalizado(request):
             for a in qs.order_by('apellido', 'nombre')
         ]
 
-    # Grupos "puros": disciplina seleccionada sin combo
+    # Grupos "puros": disciplina seleccionada sin combo, solo quienes pagaron el mes
     for cod in codigos:
-        qs = base_qs.filter(disciplina=cod, combo='')
+        qs = base_qs.filter(disciplina=cod, combo='', id__in=pagadores_ids)
         ids = list(qs.values_list('id', flat=True))
         if ids:
             ids_totales.update(ids)
@@ -150,14 +154,14 @@ def personalizado(request):
             'alumnos': serializar_alumnos(qs, pagos_por_alumno),
         })
 
-    # Grupos "combo": ambas disciplinas del combo están seleccionadas
+    # Grupos "combo": ambas disciplinas del combo están seleccionadas, solo quienes pagaron el mes
     combo_disciplinas = {
         ComboTipo.HYROX_CF: {'HX', 'CF'},
         ComboTipo.HYROX_HF: {'HX', 'HF'},
     }
     for combo_codigo, disc_req in combo_disciplinas.items():
         if disc_req.issubset(codigos_set):
-            qs = base_qs.filter(combo=combo_codigo)
+            qs = base_qs.filter(combo=combo_codigo, id__in=pagadores_ids)
             ids = list(qs.values_list('id', flat=True))
             if ids:
                 ids_totales.update(ids)
