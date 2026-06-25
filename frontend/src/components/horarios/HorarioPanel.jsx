@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { X, Save, Loader2, CalendarClock } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../../lib/api'
+import { useDisciplinas } from '../../hooks/useDisciplinas'
 
 const DIAS = [
   { val: 'lun', label: 'Lunes' },
@@ -13,21 +14,14 @@ const DIAS = [
   { val: 'sab', label: 'Sábado' },
 ]
 
-const DISCIPLINAS = [
-  { val: 'CF', label: 'CrossFit' },
-  { val: 'HF', label: 'Heavy Funcional' },
-  { val: 'HX', label: 'Hyrox' },
-  { val: 'TN', label: 'Teens' },
-  { val: 'KD', label: 'Kids' },
-  { val: 'BP', label: 'Bonus Pack' },
-]
-
 const SEDES = [
   { val: '107', label: 'Athlon 107' },
   { val: '24',  label: 'Athlon 24' },
 ]
 
-function toISO(d) { return d.toISOString().slice(0, 10) }
+function toISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
 
 function proximoLunes() {
   const hoy = new Date()
@@ -44,9 +38,20 @@ export default function HorarioPanel({ horario, defaultDia, defaultSede, profes,
   const hoy   = toISO(new Date())
   const lunes = proximoLunes()
 
+  // Disciplinas dinámicas (todas, incluyendo inactivas para edición)
+  const { discs } = useDisciplinas()
+  const DISCIPLINAS = discs.length > 0
+    ? discs.map(d => ({ val: d.codigo, label: d.nombre }))
+    : [
+        { val: 'CF', label: 'CrossFit' }, { val: 'HF', label: 'Heavy Funcional' },
+        { val: 'HX', label: 'Hyrox' },   { val: 'FB', label: 'FullBody' },
+        { val: 'TN', label: 'Teens' },    { val: 'KD', label: 'Kids' },
+        { val: 'BP', label: 'Bonus Pack' },
+      ]
+
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
-  const [fechaDesde,  setFechaDesde]  = useState(isEdit ? lunes : hoy)
+  const [fechaDesde,  setFechaDesde]  = useState(hoy)
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm({
     defaultValues: isEdit ? {
@@ -213,7 +218,7 @@ export default function HorarioPanel({ horario, defaultDia, defaultSede, profes,
                 <CalendarClock size={12}/>
                 Vigente desde
               </label>
-              {/* Atajos rápidos */}
+              {/* Atajo rápido */}
               <div className="flex gap-2 mb-2">
                 <button
                   type="button"
@@ -226,18 +231,6 @@ export default function HorarioPanel({ horario, defaultDia, defaultSede, profes,
                   )}
                 >
                   Hoy
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFechaDesde(lunes)}
-                  className={clsx(
-                    'flex-1 py-1.5 rounded-lg border text-xs font-medium transition-colors',
-                    fechaDesde === lunes
-                      ? 'bg-indigo-700 border-indigo-600 text-white'
-                      : 'bg-dark-bg border-dark-border text-dark-muted hover:text-dark-text'
-                  )}
-                >
-                  Próximo lunes
                 </button>
               </div>
               <input

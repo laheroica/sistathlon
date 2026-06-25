@@ -4,33 +4,21 @@ import { DollarSign, ChevronLeft, ChevronRight, Copy, Save, Check } from 'lucide
 import clsx from 'clsx'
 import api from '../lib/api'
 import { toast } from 'sonner'
-
-// ---------------------------------------------------------------------------
-// Constantes
-// ---------------------------------------------------------------------------
-
-const DISCIPLINAS = [
-  { value: 'CF', label: 'CrossFit' },
-  { value: 'HF', label: 'Heavy Funcional' },
-  { value: 'HX', label: 'Hyrox' },
-  { value: 'TN', label: 'Teens' },
-  { value: 'KD', label: 'Kids' },
-  { value: 'FB', label: 'FullBody' },
-]
-
-const FRECUENCIAS = {
-  CF: ['2x', '3x', 'libre'],
-  HF: ['2x', '3x', '5x'],
-  HX: ['3x'],
-  TN: ['3x'],
-  KD: ['3x'],
-  FB: ['libre'],
-}
+import { useDisciplinas } from '../hooks/useDisciplinas'
 
 const FREC_LABEL = {
   '2x': '2x semana', '3x': '3x semana',
   '5x': '5x semana', 'libre': 'Pase Libre',
 }
+
+// Filas de combos — disciplina='COMBO', frecuencia='combo1'…'combo5'
+const COMBO_ROWS = [
+  { frecuencia: 'combo1', label: 'Combo 1' },
+  { frecuencia: 'combo2', label: 'Combo 2' },
+  { frecuencia: 'combo3', label: 'Combo 3' },
+  { frecuencia: 'combo4', label: 'Combo 4' },
+  { frecuencia: 'combo5', label: 'Combo 5' },
+]
 
 const TIPOS = [
   { value: 'regular',    label: 'Regular (1–10)' },
@@ -47,19 +35,6 @@ function mesLabel(anio, mes) {
   return d.toLocaleString('es-AR', { month: 'long', year: 'numeric' })
     .replace(/^\w/, c => c.toUpperCase())
 }
-
-// Genera todas las combinaciones posibles disc × frec
-function combos() {
-  const result = []
-  for (const disc of DISCIPLINAS) {
-    for (const frec of (FRECUENCIAS[disc.value] || [])) {
-      result.push({ disciplina: disc.value, discLabel: disc.label, frecuencia: frec })
-    }
-  }
-  return result
-}
-
-const COMBOS = combos()
 
 // ---------------------------------------------------------------------------
 // Componente celda editable
@@ -119,6 +94,17 @@ export default function PreciosPage() {
   const hoy    = new Date()
   const [anio, setAnio] = useState(hoy.getFullYear())
   const [mes,  setMes]  = useState(hoy.getMonth() + 1)
+
+  // Disciplinas dinámicas
+  const { discs } = useDisciplinas()
+  // Genera combinaciones disc × frec dinámicamente
+  const COMBOS = discs.flatMap(d =>
+    (d.frecuencias || []).map(frec => ({
+      disciplina: d.codigo,
+      discLabel:  d.nombre,
+      frecuencia: frec,
+    }))
+  )
   const [cambios, setCambios]   = useState({})   // key: "disc|frec|tipo" → precio
   const [guardando, setGuardando] = useState(false)
   const [guardados, setGuardados] = useState(false)
@@ -285,6 +271,36 @@ export default function PreciosPage() {
                   </tr>
                 )
               })}
+
+              {/* ── Sección Combos ──────────────────────────────── */}
+              <tr className="border-t-2 border-dark-border bg-dark-bg/60">
+                <td colSpan={2 + TIPOS.length} className="px-4 py-2">
+                  <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">
+                    Combos
+                  </span>
+                  <span className="text-xs text-dark-muted ml-2">(Hyrox + otra disciplina)</span>
+                </td>
+              </tr>
+              {COMBO_ROWS.map((row) => (
+                <tr key={row.frecuencia}
+                  className="border-b border-dark-border/50 transition-colors hover:bg-dark-bg/40">
+                  <td className="px-4 py-2.5">
+                    <span className="text-sm font-medium text-dark-text">{row.label}</span>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <span className="text-xs text-dark-muted">—</span>
+                  </td>
+                  {TIPOS.map(({ value: tipo }) => (
+                    <td key={tipo} className="px-3 py-2">
+                      <CeldaPrecio
+                        valor={getPrecio('COMBO', row.frecuencia, tipo)}
+                        onChange={v => setCambio('COMBO', row.frecuencia, tipo, v)}
+                        guardando={guardando}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
             </tbody>
           </table>
 

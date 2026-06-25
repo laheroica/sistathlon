@@ -94,6 +94,98 @@ def dashboard(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+def personalizado(request):
+    from apps.alumnos.models import Alumno, DiscipConfig, ComboTipo, EstadoAlumno
+    from apps.pagos.models import Pago
+
+    disc_param = request.GET.get('disciplinas', '')
+    codigos = [c for c in disc_param.split(',') if c]
+    sede = request.GET.get('sede', '')
+    mes_param = request.GET.get('mes')
+
+    if mes_param:
+        anio, mes_n = mes_param.split('-')
+        mes = date(int(anio), int(mes_n), 1)
+    else:
+        hoy = date.today()
+        mes = date(hoy.year, hoy.month, 1)
+
+    if not codigos:
+        return Response({'grupos': [], 'total_alumnos': 0, 'total_cobrado': 0, 'mes': mes.strftime('%Y-%m')})
+
+    nombres = dict(DiscipConfig.objects.values_list('codigo', 'nombre'))
+    codigos_set = set(codigos)
+
+    base_qs = Alumno.objects.filter(estado=EstadoAlumno.ACTIVO)
+    if sede:
+        base_qs = base_qs.filter(sede=sede)
+
+    grupos = []
+    ids_totales = set()
+
+    def serializar_alumnos(qs, pagos_por_alumno):
+        return [
+            {
+                'id': a.id,
+                'nombre': a.nombre_completo,
+                'sede': a.sede,
+                'monto_pagado': float(pagos_por_alumno.get(a.id, 0)),
+            }
+            for a in qs.order_by('apellido', 'nombre')
+        ]
+
+    # Grupos "puros": disciplina seleccionada sin combo
+    for cod in codigos:
+        qs = base_qs.filter(disciplina=cod, combo='')
+        ids = list(qs.values_list('id', flat=True))
+        if ids:
+            ids_totales.update(ids)
+        pagos_por_alumno = dict(
+            Pago.objects.filter(mes=mes, alumno_id__in=ids).values_list('alumno_id', 'monto')
+        )
+        grupos.append({
+            'label': nombres.get(cod, cod),
+            'tipo': 'puro',
+            'cantidad': len(ids),
+            'alumnos': serializar_alumnos(qs, pagos_por_alumno),
+        })
+
+    # Grupos "combo": ambas disciplinas del combo están seleccionadas
+    combo_disciplinas = {
+        ComboTipo.HYROX_CF: {'HX', 'CF'},
+        ComboTipo.HYROX_HF: {'HX', 'HF'},
+    }
+    for combo_codigo, disc_req in combo_disciplinas.items():
+        if disc_req.issubset(codigos_set):
+            qs = base_qs.filter(combo=combo_codigo)
+            ids = list(qs.values_list('id', flat=True))
+            if ids:
+                ids_totales.update(ids)
+            pagos_por_alumno = dict(
+                Pago.objects.filter(mes=mes, alumno_id__in=ids).values_list('alumno_id', 'monto')
+            )
+            label = ' + '.join(nombres.get(c, c) for c in sorted(disc_req))
+            grupos.append({
+                'label': f'Combo {label}',
+                'tipo': 'combo',
+                'cantidad': len(ids),
+                'alumnos': serializar_alumnos(qs, pagos_por_alumno),
+            })
+
+    total_cobrado = Pago.objects.filter(
+        mes=mes, alumno_id__in=ids_totales
+    ).aggregate(t=Sum('monto'))['t'] or 0
+
+    return Response({
+        'grupos': grupos,
+        'total_alumnos': len(ids_totales),
+        'total_cobrado': float(total_cobrado),
+        'mes': mes.strftime('%Y-%m'),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def anual(request):
     from apps.alumnos.models import Alumno
     from apps.pagos.models import Pago

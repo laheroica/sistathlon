@@ -6,6 +6,8 @@ class HorarioMaestroSerializer(serializers.ModelSerializer):
     profe_nombre = serializers.ReadOnlyField(source='profe.nombre')
     profe_color  = serializers.ReadOnlyField(source='profe.color')
     hora_str     = serializers.SerializerMethodField()
+    # Acepta cualquier código dinámico de disciplina
+    disciplina   = serializers.CharField(max_length=10)
 
     class Meta:
         model  = HorarioMaestro
@@ -22,6 +24,7 @@ class HorarioMaestroSerializer(serializers.ModelSerializer):
 class HorarioRealSerializer(serializers.ModelSerializer):
     profe_planificado_nombre = serializers.ReadOnlyField(source='profe_planificado.nombre')
     profe_real_nombre        = serializers.ReadOnlyField(source='profe_real.nombre')
+    disciplina               = serializers.CharField(max_length=10)
 
     class Meta:
         model  = HorarioReal

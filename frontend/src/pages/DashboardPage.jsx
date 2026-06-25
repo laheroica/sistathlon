@@ -10,9 +10,11 @@ import {
 import clsx from 'clsx'
 import api from '../lib/api'
 import { money } from '../lib/format'
+import { useDisciplinas } from '../hooks/useDisciplinas'
 
-const DISC_LABEL = { CF: 'CrossFit', HF: 'Heavy Func.', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus' }
-const DISC_COLOR = { CF: '#3b82f6', HF: '#22c55e', HX: '#eab308', TN: '#a855f7', KD: '#ec4899', BP: '#0ea5e9' }
+// Fallbacks mientras carga la API
+const DISC_LABEL_FB = { CF: 'CrossFit', HF: 'Heavy Func.', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus', FB: 'FullBody' }
+const DISC_COLOR_FB = { CF: '#3b82f6', HF: '#22c55e', HX: '#eab308', TN: '#a855f7', KD: '#ec4899', BP: '#0ea5e9', FB: '#f97316' }
 
 // ── Tooltip personalizado para el gráfico ─────────────────────────────────────
 function CustomTooltip({ active, payload, label }) {
@@ -62,6 +64,11 @@ export default function DashboardPage() {
     queryFn: () => api.get('/reportes/dashboard/').then(r => r.data),
     staleTime: 60_000,
   })
+
+  // Disciplinas dinámicas
+  const { labelMap: apiLabelMap, colorMap: apiColorMap } = useDisciplinas()
+  const DISC_LABEL = { ...DISC_LABEL_FB, ...apiLabelMap }
+  const DISC_COLOR = { ...DISC_COLOR_FB, ...apiColorMap }
 
   if (isLoading) {
     return (

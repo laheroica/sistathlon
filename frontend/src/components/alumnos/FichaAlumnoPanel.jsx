@@ -11,21 +11,19 @@ import SlidePanel from '../ui/SlidePanel'
 import api from '../../lib/api'
 import clsx from 'clsx'
 import { money } from '../../lib/format'
+import { useDisciplinas } from '../../hooks/useDisciplinas'
 
-// ─── Constantes ────────────────────────────────────────────────────────────────
-const DISC_LABEL  = { CF: 'CrossFit', HF: 'Heavy Func.', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus' }
-const DISC_BADGE  = {
+// ─── Fallbacks (por si la API tarda) ──────────────────────────────────────────
+const DISC_LABEL_FB  = { CF: 'CrossFit', HF: 'Heavy Func.', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus', FB: 'FullBody' }
+const DISC_BADGE_FB  = {
   CF: 'bg-blue-900/70 text-blue-200', HF: 'bg-green-900/70 text-green-200',
   HX: 'bg-yellow-900/70 text-yellow-200', TN: 'bg-purple-900/70 text-purple-200',
   KD: 'bg-pink-900/70 text-pink-200', BP: 'bg-sky-900/70 text-sky-200',
+  FB: 'bg-orange-900/70 text-orange-200',
 }
 const ESTADO_COLOR = {
   activo: 'text-green-400', mora: 'text-yellow-400',
   baja: 'text-orange-400', alejado: 'text-red-400', temporal: 'text-sky-400',
-}
-const FRECUENCIAS = {
-  CF: ['2x','3x','libre'], HF: ['2x','3x','5x'],
-  HX: ['3x'], TN: ['3x'], KD: ['3x'], BP: ['3x'],
 }
 const FREQ_LABEL = { '2x': '2×/sem', '3x': '3×/sem', '5x': '5×/sem', libre: 'Libre' }
 const HORARIOS   = ['06:00','07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00']
@@ -126,6 +124,14 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
   const qc   = useQueryClient()
   const meses = mesOptions()
 
+  // Disciplinas dinámicas
+  const { labelMap: apiLabelMap, badgeMap: apiBadgeMap, frecMap } = useDisciplinas()
+  const DISC_LABEL = { ...DISC_LABEL_FB, ...apiLabelMap }
+  const DISC_BADGE = { ...DISC_BADGE_FB, ...apiBadgeMap }
+  // Frecuencias dinámicas (fallback a las hardcodeadas para compatibilidad)
+  const FRECUENCIAS_FB = { CF: ['2x','3x','libre'], HF: ['2x','3x','5x'], HX: ['3x'], TN: ['3x'], KD: ['3x'], BP: ['libre'], FB: ['2x','3x','5x'] }
+  const FRECUENCIAS = Object.keys(frecMap).length > 0 ? frecMap : FRECUENCIAS_FB
+
   // Estado local del alumno (para reflejar cambios inmediatos en la UI)
   const [alumno, setAlumno] = useState(alumnoInit)
   useEffect(() => { setAlumno(alumnoInit) }, [alumnoInit])
@@ -139,7 +145,7 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
     setAlumno(prev => ({ ...prev, [field]: value }))  // reflejo visual inmediato
   }
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(pagoSchema),
     defaultValues: {
       mes:        format(startOfMonth(new Date()), 'yyyy-MM-dd'),
@@ -163,19 +169,32 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
   }, [alumnoInit, reset])
 
   // Horarios disponibles según sede + disciplina (+ combo Hyrox si aplica)
+  const isCombo = !!(alumno?.combo)
   const disciplinasHorario = [alumno?.disciplina].filter(Boolean)
   if (alumno?.combo === 'hyrox_cf' || alumno?.combo === 'hyrox_hf') disciplinasHorario.push('HX')
   const { data: horariosDisponibles } = useQuery({
-    queryKey: ['horarios-disponibles', alumno?.sede, disciplinasHorario],
+    queryKey: ['horarios-disponibles', alumno?.sede, disciplinasHorario, isCombo],
     queryFn: () => {
       const params = new URLSearchParams()
       if (alumno?.sede) params.append('sede', alumno.sede)
       disciplinasHorario.forEach(d => params.append('disciplina', d))
+      if (isCombo) params.append('grouped', 'true')
       return api.get(`/horarios/disponibles/?${params}`).then(r => r.data)
     },
     enabled: !!alumno?.sede && !!alumno?.disciplina,
   })
-  const horariosGrid = horariosDisponibles || HORARIOS
+  // horariosGrid: string[] (sin combo) o [{disciplina, horas[]}] (con combo)
+  const horariosGrid = horariosDisponibles ?? HORARIOS
+
+  // Precios de combos para sugerencia rápida en el form de pago
+  const mesParaPrecios = format(startOfMonth(new Date()), 'yyyy-MM')
+  const { data: comboPrices = [] } = useQuery({
+    queryKey: ['precios-combo', mesParaPrecios],
+    queryFn: () => api.get(`/precios/?mes=${mesParaPrecios}`)
+      .then(r => r.data.filter(p => p.disciplina === 'COMBO' && p.tipo === 'regular')),
+    enabled: isCombo,
+    staleTime: 5 * 60 * 1000,
+  })
 
   // PATCH campo del alumno
   const patchAlumno = useMutation({
@@ -324,6 +343,37 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
             />
           </div>
 
+          {/* Pertenencia (solo para FB y HX) */}
+          {['FB','HX'].includes(alumno.disciplina) && (
+            <div>
+              <p className="text-xs text-dark-muted mb-1.5">Pertenencia / Split</p>
+              <ChipSelector
+                options={[
+                  { value: 'athlon', label: 'Athlon (100%)' },
+                  { value: 'day',    label: 'Day (50/50)' },
+                  { value: 'otro',   label: 'Otro' },
+                ]}
+                value={alumno.pertenencia || 'athlon'}
+                onChange={(v) => {
+                  setPend('pertenencia', v)
+                  if (v === 'day') setPend('porcentaje_athlon', 50)
+                  if (v === 'athlon') setPend('porcentaje_athlon', 100)
+                }}
+              />
+              {(alumno.pertenencia === 'otro') && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs text-dark-muted">% Athlon:</span>
+                  <input
+                    type="number" min="0" max="100"
+                    className="input w-20 text-sm py-1"
+                    value={alumno.porcentaje_athlon ?? 100}
+                    onChange={e => setPend('porcentaje_athlon', parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Combo (solo para CF y HF) */}
           {['CF','HF'].includes(alumno.disciplina) && (
             <div>
@@ -349,23 +399,68 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
           {/* Horario */}
           <div>
             <p className="text-xs text-dark-muted mb-1.5">Horario</p>
-            <div className="grid grid-cols-4 gap-1.5">
-              {horariosGrid.map((h) => (
-                <button
-                  key={h}
-                  type="button"
-                  onClick={() => setPend('horario', h)}
-                  className={clsx(
-                    'py-1.5 rounded-lg text-xs font-mono font-medium border transition-all',
-                    alumno.horario === h
-                      ? 'bg-primary-dark border-primary-dark text-white'
-                      : 'border-dark-border text-dark-muted hover:border-primary-dark/50'
-                  )}
-                >
-                  {h}
-                </button>
-              ))}
-            </div>
+            {isCombo && Array.isArray(horariosGrid) && horariosGrid[0]?.disciplina ? (
+              // Modo combo: cada disciplina tiene su propio selector de horario
+              <div className="space-y-4">
+                {horariosGrid.map(grupo => {
+                  // La disciplina principal guarda en `horario`; la combo en `horario_combo`
+                  const esDiscPrincipal = grupo.disciplina === alumno.disciplina
+                  const field    = esDiscPrincipal ? 'horario' : 'horario_combo'
+                  const selected = esDiscPrincipal ? alumno.horario : alumno.horario_combo
+                  return (
+                    <div key={grupo.disciplina}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className={clsx(
+                          'inline-block px-2 py-0.5 rounded text-xs font-medium',
+                          DISC_BADGE[grupo.disciplina] || 'bg-gray-700 text-gray-300'
+                        )}>
+                          {DISC_LABEL[grupo.disciplina] || grupo.disciplina}
+                        </span>
+                        {selected && (
+                          <span className="text-xs text-dark-muted font-mono">{selected}</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {grupo.horas.map(h => (
+                          <button
+                            key={`${grupo.disciplina}-${h}`}
+                            type="button"
+                            onClick={() => setPend(field, h)}
+                            className={clsx(
+                              'py-1.5 rounded-lg text-xs font-mono font-medium border transition-all',
+                              selected === h
+                                ? 'bg-primary-dark border-primary-dark text-white'
+                                : 'border-dark-border text-dark-muted hover:border-primary-dark/50'
+                            )}
+                          >
+                            {h}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              // Modo normal: lista plana de horas
+              <div className="grid grid-cols-4 gap-1.5">
+                {(Array.isArray(horariosGrid) ? horariosGrid : HORARIOS).map((h) => (
+                  <button
+                    key={h}
+                    type="button"
+                    onClick={() => setPend('horario', h)}
+                    className={clsx(
+                      'py-1.5 rounded-lg text-xs font-mono font-medium border transition-all',
+                      alumno.horario === h
+                        ? 'bg-primary-dark border-primary-dark text-white'
+                        : 'border-dark-border text-dark-muted hover:border-primary-dark/50'
+                    )}
+                  >
+                    {h}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           {/* Botón guardar actividad */}
           {hayPendiente && (
@@ -406,6 +501,32 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
               {meses.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </div>
+
+          {/* Precio sugerido combo */}
+          {isCombo && comboPrices.length > 0 && (
+            <div>
+              <label className="block text-xs text-dark-muted mb-1.5">
+                Precio combo <span className="text-dark-border">(clic para aplicar)</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[...comboPrices]
+                  .sort((a, b) => a.frecuencia.localeCompare(b.frecuencia))
+                  .map(p => (
+                    <button
+                      key={p.frecuencia}
+                      type="button"
+                      onClick={() => setValue('monto', parseFloat(p.precio))}
+                      className="px-3 py-1.5 rounded-lg border border-dark-border text-xs
+                        text-dark-muted hover:border-indigo-500 hover:text-dark-text
+                        hover:bg-indigo-900/20 transition-colors bg-dark-bg font-medium"
+                    >
+                      {p.frecuencia.replace('combo', 'Combo ')} · ${Number(p.precio).toLocaleString('es-AR')}
+                    </button>
+                  ))
+                }
+              </div>
+            </div>
+          )}
 
           {/* Monto + Fecha en fila */}
           <div className="grid grid-cols-2 gap-3">

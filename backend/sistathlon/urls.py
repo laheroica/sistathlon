@@ -29,6 +29,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.alumnos.auth_urls')),
     path('api/alumnos/', include('apps.alumnos.urls')),
+    path('api/disciplinas/', include('apps.alumnos.disc_urls')),
     path('api/profes/', include('apps.profes.urls')),
     path('api/horarios/', include('apps.horarios.urls')),
     path('api/pagos/', include('apps.pagos.urls')),

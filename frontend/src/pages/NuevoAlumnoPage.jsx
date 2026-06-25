@@ -6,25 +6,16 @@ import api from '../lib/api'
 import clsx from 'clsx'
 import { money } from '../lib/format'
 import RegistrarPagoPanel from '../components/pagos/RegistrarPagoPanel'
+import { useDisciplinas } from '../hooks/useDisciplinas'
 
 const PASOS = ['Datos personales', 'Actividad y cuota', 'Confirmar']
 
-const DISCIPLINAS = [
-  { value: 'CF', label: 'Crossfit' },
-  { value: 'HF', label: 'Heavy Funcional' },
-  { value: 'HX', label: 'Hyrox' },
-  { value: 'TN', label: 'Crossfit Teens' },
-  { value: 'KD', label: 'Crossfit Kids' },
-  { value: 'FB', label: 'FullBody' },
-]
-
-const FRECUENCIAS = {
-  CF: [{ value: '2x', label: '2x semana' }, { value: '3x', label: '3x semana' }, { value: 'libre', label: 'Pase Libre' }],
-  HF: [{ value: '2x', label: '2x semana' }, { value: '3x', label: '3x semana' }, { value: '5x', label: '5x semana' }],
-  HX: [{ value: '3x', label: '3x semana (Mar/Jue/Sáb)' }],
-  TN: [{ value: '3x', label: '3x semana' }],
-  KD: [{ value: '3x', label: '3x semana' }],
-  FB: [{ value: 'libre', label: 'Mensual' }],
+// Etiquetas para frecuencias estándar
+const FREC_LABEL_MAP = {
+  '2x': '2× semana', '3x': '3× semana', '5x': '5× semana', libre: 'Pase Libre'
+}
+function frecToOpts(frecs) {
+  return frecs.map(f => ({ value: f, label: FREC_LABEL_MAP[f] || f }))
 }
 
 const PERTENENCIA_OPTS = [
@@ -37,6 +28,10 @@ const TIPO_PRECIO_LABEL = { regular: 'Regular (1–10)', unlpam: 'UNLPam (1–10
 
 export default function NuevoAlumnoPage() {
   const navigate = useNavigate()
+  // Disciplinas dinámicas (solo activas)
+  const { discs } = useDisciplinas({ soloActivas: true })
+  const DISCIPLINAS = discs.map(d => ({ value: d.codigo, label: d.nombre }))
+  const FRECUENCIAS = Object.fromEntries(discs.map(d => [d.codigo, frecToOpts(d.frecuencias)]))
   const [paso, setPaso] = useState(0)
   const [form, setForm] = useState({
     nombre: '', apellido: '', dni: '', celular: '', email: '', instagram: '',
@@ -87,7 +82,6 @@ export default function NuevoAlumnoPage() {
     // Validaciones paso 0
     if (paso === 0) {
       if (!form.nombre || !form.apellido) return setErrorPaso('Completá nombre y apellido.')
-      if (!form.dni)  return setErrorPaso('El DNI es obligatorio.')
       if (!form.sede) return setErrorPaso('Seleccioná una sede.')
     }
     // Validaciones paso 1
@@ -105,7 +99,11 @@ export default function NuevoAlumnoPage() {
   }
 
   function handleSubmit(conPago = false) {
-    mutation.mutate(form, {
+    const payload = {
+      ...form,
+      fecha_nacimiento: form.fecha_nacimiento || null,
+    }
+    mutation.mutate(payload, {
       onSuccess: (data) => {
         if (conPago) {
           setAlumnoCreado({
@@ -170,12 +168,12 @@ export default function NuevoAlumnoPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-dark-muted mb-1">DNI *</label>
-                <input className="input" value={form.dni} onChange={(e) => set('dni', e.target.value)} required />
+                <label className="block text-xs text-dark-muted mb-1">DNI</label>
+                <input className="input" value={form.dni} onChange={(e) => set('dni', e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs text-dark-muted mb-1">Celular *</label>
-                <input className="input" type="tel" value={form.celular} onChange={(e) => set('celular', e.target.value)} required />
+                <label className="block text-xs text-dark-muted mb-1">Celular</label>
+                <input className="input" type="tel" value={form.celular} onChange={(e) => set('celular', e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

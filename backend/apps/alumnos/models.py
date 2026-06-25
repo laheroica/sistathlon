@@ -67,7 +67,9 @@ class Alumno(models.Model):
     frecuencia = models.CharField(max_length=10, choices=Frecuencia.choices)
     combo = models.CharField(max_length=20, choices=ComboTipo.choices, default='', blank=True)
     bonus_pack = models.BooleanField(default=False)
-    horario = models.CharField(max_length=20, blank=True)
+    horario       = models.CharField(max_length=20, blank=True)
+    horario_combo = models.CharField(max_length=20, blank=True,
+        help_text='Horario de la disciplina combo (ej: Hyrox). Solo aplica cuando combo != ""')
 
     # Pertenencia (espacio que gestiona al alumno)
     pertenencia = models.CharField(max_length=10, choices=Pertenencia.choices, default=Pertenencia.ATHLON)
@@ -121,3 +123,29 @@ class Alumno(models.Model):
         ultimo_dia = calendar.monthrange(hoy.year, hoy.month)[1]
         vencimiento = hoy.replace(day=ultimo_dia)
         return (vencimiento - hoy).days
+
+
+# ── Configuración dinámica de disciplinas ──────────────────────────────────────
+
+class DiscipConfig(models.Model):
+    """Catálogo editable de disciplinas. Reemplaza los TextChoices hardcodeados."""
+    codigo      = models.CharField(max_length=10, unique=True,
+                                   help_text='Código corto: CF, HF, HX, FB…')
+    nombre      = models.CharField(max_length=50)
+    frecuencias = models.JSONField(default=list,
+                                   help_text='Ej: ["2x","3x","libre"]')
+    color_badge = models.CharField(max_length=150,
+                                   default='bg-gray-700 text-gray-200',
+                                   help_text='Clases Tailwind para el badge')
+    color_hex   = models.CharField(max_length=20, default='#6b7280',
+                                   help_text='Color hex para gráficos')
+    orden       = models.PositiveIntegerField(default=0)
+    activo      = models.BooleanField(default=True)
+
+    class Meta:
+        ordering            = ['orden', 'nombre']
+        verbose_name        = 'Disciplina'
+        verbose_name_plural = 'Disciplinas'
+
+    def __str__(self):
+        return f"{self.codigo} — {self.nombre}"

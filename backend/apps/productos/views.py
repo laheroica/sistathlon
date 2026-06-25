@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
-from django.db.models import Sum, Q
-from rest_framework import generics
+from django.db.models import Sum, Q, ProtectedError
+from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -31,6 +31,20 @@ class ProductoDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class   = ProductoSerializer
     permission_classes = [IsAuthenticated]
     queryset           = Producto.objects.all()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            instance.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ProtectedError:
+            # Tiene ventas — solo desactivar
+            instance.activo = False
+            instance.save(update_fields=['activo'])
+            return Response(
+                {'desactivado': True, 'detail': 'El producto tiene ventas registradas y no puede eliminarse. Se desactivó.'},
+                status=status.HTTP_200_OK,
+            )
 
 
 # ── Ventas ─────────────────────────────────────────────────────────────────────

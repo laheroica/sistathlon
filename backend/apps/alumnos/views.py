@@ -1,9 +1,29 @@
 from django.db.models import Q
 from rest_framework import generics, filters
 from rest_framework.decorators import api_view
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .models import Alumno, EstadoAlumno
-from .serializers import AlumnoListSerializer, AlumnoDetailSerializer, AlumnoCreateSerializer, AlumnoPatchSerializer
+from .models import Alumno, EstadoAlumno, DiscipConfig
+from .serializers import (
+    AlumnoListSerializer, AlumnoDetailSerializer,
+    AlumnoCreateSerializer, AlumnoPatchSerializer,
+    DiscipConfigSerializer,
+)
+
+
+# ── Disciplinas (ABM dinámico) ─────────────────────────────────────────────────
+
+class DiscipConfigListCreateView(generics.ListCreateAPIView):
+    serializer_class   = DiscipConfigSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class   = None
+    queryset           = DiscipConfig.objects.all()
+
+
+class DiscipConfigDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class   = DiscipConfigSerializer
+    permission_classes = [IsAuthenticated]
+    queryset           = DiscipConfig.objects.all()
 
 
 class AlumnoListView(generics.ListAPIView):
@@ -91,7 +111,7 @@ def calcular_cuota(request):
     cuota = precio_base
     proporcional = None
 
-    if fecha_inicio_str and disciplina != 'FB':   # FullBody: precio único sin proporcional
+    if fecha_inicio_str:
         try:
             from datetime import datetime
             fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()

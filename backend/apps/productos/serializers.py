@@ -4,13 +4,20 @@ from .models import Producto, Venta, VentaItem, MovimientoCuentaCorriente
 
 class ProductoSerializer(serializers.ModelSerializer):
     categoria_label = serializers.SerializerMethodField()
+    stock_total     = serializers.SerializerMethodField()
 
     class Meta:
         model  = Producto
-        fields = ['id', 'nombre', 'categoria', 'categoria_label', 'precio', 'stock', 'activo']
+        fields = [
+            'id', 'nombre', 'categoria', 'categoria_label', 'precio',
+            'stock_107', 'stock_24', 'stock_total', 'activo',
+        ]
 
     def get_categoria_label(self, obj):
         return obj.get_categoria_display()
+
+    def get_stock_total(self, obj):
+        return obj.stock_107 + obj.stock_24
 
 
 class VentaItemReadSerializer(serializers.ModelSerializer):
@@ -59,6 +66,7 @@ class VentaSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
         venta = Venta.objects.create(**validated_data)
+        sede  = venta.sede  # '107' o '24'
 
         for item_data in items_data:
             producto = item_data['producto']
@@ -71,8 +79,14 @@ class VentaSerializer(serializers.ModelSerializer):
                 cantidad=cantidad,
                 precio_unitario=precio_u,
             )
-            producto.stock = max(0, producto.stock - cantidad)
-            producto.save(update_fields=['stock'])
+
+            # Descontar del stock de la sede de la venta
+            if sede == '107':
+                producto.stock_107 = max(0, producto.stock_107 - cantidad)
+                producto.save(update_fields=['stock_107'])
+            else:
+                producto.stock_24 = max(0, producto.stock_24 - cantidad)
+                producto.save(update_fields=['stock_24'])
 
         if venta.metodo_pago == 'cuenta_corriente' and venta.alumno_id:
             MovimientoCuentaCorriente.objects.create(

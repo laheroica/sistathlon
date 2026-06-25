@@ -1,5 +1,13 @@
 from rest_framework import serializers
-from .models import Alumno
+from .models import Alumno, DiscipConfig
+
+
+# ── Disciplinas ────────────────────────────────────────────────────────────────
+
+class DiscipConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = DiscipConfig
+        fields = ['id', 'codigo', 'nombre', 'frecuencias', 'color_badge', 'color_hex', 'orden', 'activo']
 
 
 class AlumnoListSerializer(serializers.ModelSerializer):
@@ -12,7 +20,7 @@ class AlumnoListSerializer(serializers.ModelSerializer):
         model = Alumno
         fields = [
             'id', 'nombre', 'apellido', 'nombre_completo', 'celular', 'instagram',
-            'sede', 'disciplina', 'frecuencia', 'combo', 'bonus_pack', 'horario',
+            'sede', 'disciplina', 'frecuencia', 'combo', 'bonus_pack', 'horario', 'horario_combo',
             'tipo_precio', 'cuota_actual', 'estado', 'fecha_inicio',
             'pertenencia', 'porcentaje_athlon', 'precio_especial', 'motivo_precio_especial',
             'dias_hasta_vencimiento', 'ultimo_pago', 'dias_sin_pago',
@@ -73,17 +81,27 @@ def normalizar_horario(valor):
 
 
 class AlumnoCreateSerializer(serializers.ModelSerializer):
+    # Acepta cualquier código de disciplina (incluyendo los creados dinámicamente)
+    disciplina = serializers.CharField(max_length=10)
+    frecuencia = serializers.CharField(max_length=10)
+    dni = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
+    celular = serializers.CharField(max_length=30, required=False, allow_blank=True, default='')
+    fecha_nacimiento = serializers.DateField(required=False, allow_null=True, default=None)
+
     class Meta:
         model = Alumno
         fields = [
             'nombre', 'apellido', 'dni', 'celular', 'email', 'instagram', 'fecha_nacimiento',
             'sede', 'fecha_inicio', 'disciplina', 'frecuencia', 'combo', 'bonus_pack',
-            'horario', 'tipo_precio', 'cuota_actual', 'notas',
+            'horario', 'horario_combo', 'tipo_precio', 'cuota_actual', 'notas',
             'pertenencia', 'porcentaje_athlon', 'precio_especial', 'motivo_precio_especial',
         ]
 
     def validate_dni(self, value):
+        import uuid
         value = value.strip().replace('.', '').replace('-', '')
+        if not value:
+            return f'SIN-DNI-{uuid.uuid4().hex[:8].upper()}'
         qs = Alumno.objects.filter(dni=value)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
@@ -97,14 +115,21 @@ class AlumnoCreateSerializer(serializers.ModelSerializer):
 
 class AlumnoPatchSerializer(serializers.ModelSerializer):
     """Serializer liviano para PATCH desde el panel de ficha."""
+    # Acepta cualquier código de disciplina dinámico
+    disciplina = serializers.CharField(max_length=10, required=False)
+    frecuencia = serializers.CharField(max_length=10, required=False)
+
     class Meta:
         model = Alumno
         fields = [
-            'disciplina', 'frecuencia', 'horario', 'estado',
+            'disciplina', 'frecuencia', 'horario', 'horario_combo', 'estado',
             'cuota_actual', 'combo', 'bonus_pack', 'notas',
             'pertenencia', 'porcentaje_athlon', 'precio_especial', 'motivo_precio_especial',
-            'celular', 'email', 'instagram', 'nombre', 'apellido',
+            'celular', 'email', 'instagram', 'nombre', 'apellido', 'sede',
         ]
 
     def validate_horario(self, value):
+        return normalizar_horario(value)
+
+    def validate_horario_combo(self, value):
         return normalizar_horario(value)

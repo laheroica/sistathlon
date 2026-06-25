@@ -18,8 +18,13 @@ class Producto(models.Model):
     nombre    = models.CharField(max_length=100)
     categoria = models.CharField(max_length=20, choices=CATEGORIAS)
     precio    = models.DecimalField(max_digits=10, decimal_places=2)
-    stock     = models.IntegerField(default=0)
+    stock_107 = models.IntegerField(default=0, verbose_name='Stock Sede 107')
+    stock_24  = models.IntegerField(default=0, verbose_name='Stock Sede 24')
     activo    = models.BooleanField(default=True)
+
+    @property
+    def stock(self):
+        return self.stock_107 + self.stock_24
 
     class Meta:
         ordering = ['categoria', 'nombre']

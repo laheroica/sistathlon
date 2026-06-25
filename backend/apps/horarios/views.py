@@ -10,15 +10,29 @@ from .serializers import HorarioMaestroSerializer, HorarioRealSerializer, Feriad
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def horarios_disponibles(request):
-    """Devuelve lista de horas únicas activas para una sede y una o más disciplinas."""
+    """Devuelve horas activas para una sede y una o más disciplinas.
+    Sin params extra → lista plana ["06:00", "07:00", ...]
+    ?grouped=true    → [{disciplina, horas}] agrupado por disciplina (útil para combos).
+    """
     sede        = request.query_params.get('sede', '')
     disciplinas = request.query_params.getlist('disciplina')   # puede ser múltiple
+    grouped     = request.query_params.get('grouped', 'false').lower() == 'true'
 
     qs = HorarioMaestro.objects.filter(activo=True)
     if sede:
         qs = qs.filter(sede=sede)
     if disciplinas:
         qs = qs.filter(disciplina__in=disciplinas)
+
+    if grouped:
+        from collections import defaultdict
+        grupos = defaultdict(set)
+        for h in qs:
+            grupos[h.disciplina].add(str(h.hora)[:5])
+        return Response([
+            {'disciplina': d, 'horas': sorted(horas)}
+            for d, horas in sorted(grupos.items())
+        ])
 
     horas = sorted(set(qs.values_list('hora', flat=True)))
     return Response([str(h)[:5] for h in horas])   # ["06:00", "07:00", ...]

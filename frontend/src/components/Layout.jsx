@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { logout } from '../lib/auth'
 import {
   LayoutDashboard, Users, UserPlus, Calendar, DollarSign,
-  MessageSquare, Archive, BarChart2, Clock, LogOut, Receipt, CreditCard, ShoppingBag, Tag
+  MessageSquare, Archive, BarChart2, Clock, LogOut, Receipt, CreditCard, ShoppingBag, Tag, BookOpen
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/alumnos',       icon: Users,           label: 'Alumnos' },
   { to: '/profes',        icon: UserPlus,        label: 'Profes',        roles: ['sadmin'] },
   { to: '/precios',       icon: Tag,             label: 'Precios',       roles: ['sadmin'] },
+  { to: '/disciplinas',  icon: BookOpen,        label: 'Disciplinas',   roles: ['sadmin'] },
   { to: '/horarios',      icon: Calendar,        label: 'Horarios' },
   { to: '/cobros',        icon: CreditCard,      label: 'Cobros' },
   { to: '/liquidaciones', icon: DollarSign,      label: 'Liquidaciones', roles: ['sadmin'] },

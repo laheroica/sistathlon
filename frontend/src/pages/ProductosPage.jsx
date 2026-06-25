@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, X, Save, Loader2, Package, ShoppingCart, CreditCard, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import clsx from 'clsx'
 import api from '../lib/api'
 import { money } from '../lib/format'
@@ -24,7 +25,8 @@ const CAT_COLOR = {
 }
 
 function hoy() {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
 function Modal({ title, onClose, children }) {
@@ -50,7 +52,7 @@ function CatalogoTab() {
   const qc = useQueryClient()
   const [modal, setModal] = useState(null)
   const [saveError, setSaveError] = useState('')
-  const [form, setForm] = useState({ nombre: '', categoria: 'indumentaria', precio: '', stock: 0, activo: true })
+  const [form, setForm] = useState({ nombre: '', categoria: 'indumentaria', precio: '', stock_107: 0, stock_24: 0, activo: true })
 
   const { data: productos = [], isLoading } = useQuery({
     queryKey: ['productos'],
@@ -69,8 +71,16 @@ function CatalogoTab() {
   })
 
   const deleteMut = useMutation({
-    mutationFn: (id) => api.delete(`/productos/${id}/`),
-    onSuccess: () => qc.invalidateQueries(['productos']),
+    mutationFn: (id) => api.delete(`/productos/${id}/`).then(r => r.data ?? null),
+    onSuccess: (data) => {
+      qc.invalidateQueries(['productos'])
+      if (data?.desactivado) {
+        toast.warning('El producto tiene ventas y no puede eliminarse. Se desactivó.')
+      } else {
+        toast.success('Producto eliminado.')
+      }
+    },
+    onError: () => toast.error('No se pudo eliminar el producto.'),
   })
 
   function openNew() {
@@ -81,16 +91,23 @@ function CatalogoTab() {
 
   function openEdit(p) {
     setSaveError('')
-    setForm({ nombre: p.nombre, categoria: p.categoria, precio: p.precio, stock: p.stock, activo: p.activo })
+    setForm({ nombre: p.nombre, categoria: p.categoria, precio: p.precio, stock_107: p.stock_107, stock_24: p.stock_24, activo: p.activo })
     setModal(p)
   }
 
   function handleSave() {
-    saveMut.mutate({ ...form, precio: parseFloat(form.precio) || 0, stock: parseInt(form.stock) || 0 })
+    saveMut.mutate({
+      ...form,
+      precio:    parseFloat(form.precio)    || 0,
+      stock_107: parseInt(form.stock_107)   || 0,
+      stock_24:  parseInt(form.stock_24)    || 0,
+    })
   }
 
-  function ajustarStock(p, delta) {
-    api.patch(`/productos/${p.id}/`, { stock: Math.max(0, p.stock + delta) })
+  function ajustarStock(p, sede, delta) {
+    const field   = sede === '107' ? 'stock_107' : 'stock_24'
+    const current = sede === '107' ? p.stock_107  : p.stock_24
+    api.patch(`/productos/${p.id}/`, { [field]: Math.max(0, current + delta) })
       .then(() => qc.invalidateQueries(['productos']))
   }
 
@@ -121,17 +138,26 @@ function CatalogoTab() {
             : (
               <div className="grid gap-2">
                 {agrupado[val].map(p => (
-                  <div key={p.id} className={clsx('flex items-center gap-3 bg-dark-card border border-dark-border rounded-lg px-3 py-2', !p.activo && 'opacity-50')}>
-                    <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', CAT_COLOR[p.categoria])}>{p.categoria_label}</span>
-                    <span className="flex-1 text-sm text-dark-text">{p.nombre}</span>
-                    <span className="text-sm font-mono text-dark-text">{money(p.precio)}</span>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => ajustarStock(p, -1)} className="w-6 h-6 flex items-center justify-center rounded bg-dark-border hover:bg-dark-surface text-dark-muted text-xs">−</button>
-                      <span className={clsx('w-8 text-center text-sm font-mono', p.stock <= 2 ? 'text-red-400' : 'text-dark-text')}>{p.stock}</span>
-                      <button onClick={() => ajustarStock(p, +1)} className="w-6 h-6 flex items-center justify-center rounded bg-dark-border hover:bg-dark-surface text-dark-muted text-xs">+</button>
+                  <div key={p.id} className={clsx('flex items-center gap-3 bg-dark-card border border-dark-border rounded-lg px-3 py-2 flex-wrap', !p.activo && 'opacity-50')}>
+                    <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium shrink-0', CAT_COLOR[p.categoria])}>{p.categoria_label}</span>
+                    <span className="flex-1 text-sm text-dark-text min-w-[120px]">{p.nombre}</span>
+                    <span className="text-sm font-mono text-dark-text shrink-0">{money(p.precio)}</span>
+                    {/* Stock sede 107 */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-xs text-dark-muted w-6 text-right">107</span>
+                      <button onClick={() => ajustarStock(p, '107', -1)} className="w-6 h-6 flex items-center justify-center rounded bg-dark-border hover:bg-dark-surface text-dark-muted text-xs">−</button>
+                      <span className={clsx('w-7 text-center text-sm font-mono', p.stock_107 <= 2 ? 'text-red-400' : 'text-dark-text')}>{p.stock_107}</span>
+                      <button onClick={() => ajustarStock(p, '107', +1)} className="w-6 h-6 flex items-center justify-center rounded bg-dark-border hover:bg-dark-surface text-dark-muted text-xs">+</button>
                     </div>
-                    <button onClick={() => openEdit(p)} className="text-dark-muted hover:text-dark-text"><Pencil size={14} /></button>
-                    <button onClick={() => { if (confirm('¿Eliminar producto?')) deleteMut.mutate(p.id) }} className="text-dark-muted hover:text-red-400"><Trash2 size={14} /></button>
+                    {/* Stock sede 24 */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-xs text-dark-muted w-5 text-right">24</span>
+                      <button onClick={() => ajustarStock(p, '24', -1)} className="w-6 h-6 flex items-center justify-center rounded bg-dark-border hover:bg-dark-surface text-dark-muted text-xs">−</button>
+                      <span className={clsx('w-7 text-center text-sm font-mono', p.stock_24 <= 2 ? 'text-red-400' : 'text-dark-text')}>{p.stock_24}</span>
+                      <button onClick={() => ajustarStock(p, '24', +1)} className="w-6 h-6 flex items-center justify-center rounded bg-dark-border hover:bg-dark-surface text-dark-muted text-xs">+</button>
+                    </div>
+                    <button onClick={() => openEdit(p)} className="text-dark-muted hover:text-dark-text shrink-0"><Pencil size={14} /></button>
+                    <button onClick={() => { if (confirm('¿Eliminar producto?')) deleteMut.mutate(p.id) }} className="text-dark-muted hover:text-red-400 shrink-0"><Trash2 size={14} /></button>
                   </div>
                 ))}
               </div>
@@ -153,14 +179,18 @@ function CatalogoTab() {
                 {CATEGORIAS.map(c => <option key={c.val} value={c.val}>{c.label}</option>)}
               </select>
             </div>
+            <div>
+              <label className="block text-xs text-dark-muted mb-1">Precio de venta</label>
+              <input type="number" className="input w-full" value={form.precio} onChange={e => setForm(f => ({ ...f, precio: e.target.value }))} />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-dark-muted mb-1">Precio de venta</label>
-                <input type="number" className="input w-full" value={form.precio} onChange={e => setForm(f => ({ ...f, precio: e.target.value }))} />
+                <label className="block text-xs text-dark-muted mb-1">Stock Sede 107</label>
+                <input type="number" min="0" className="input w-full" value={form.stock_107} onChange={e => setForm(f => ({ ...f, stock_107: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-xs text-dark-muted mb-1">Stock inicial</label>
-                <input type="number" className="input w-full" value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} />
+                <label className="block text-xs text-dark-muted mb-1">Stock Sede 24</label>
+                <input type="number" min="0" className="input w-full" value={form.stock_24} onChange={e => setForm(f => ({ ...f, stock_24: e.target.value }))} />
               </div>
             </div>
             <label className="flex items-center gap-2 text-sm text-dark-text cursor-pointer">
@@ -425,11 +455,14 @@ function NuevaVentaModal({ onClose }) {
                   <option value="">— Seleccionar —</option>
                   {CATEGORIAS.map(cat => (
                     <optgroup key={cat.val} label={cat.label}>
-                      {productos.filter(p => p.categoria === cat.val).map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.nombre} — {money(p.precio)} (stock: {p.stock})
-                        </option>
-                      ))}
+                      {productos.filter(p => p.categoria === cat.val).map(p => {
+                        const stockSede = sede === '107' ? p.stock_107 : p.stock_24
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} — {money(p.precio)} (en {sede}: {stockSede})
+                          </option>
+                        )
+                      })}
                     </optgroup>
                   ))}
                 </select>

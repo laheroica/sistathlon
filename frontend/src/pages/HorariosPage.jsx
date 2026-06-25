@@ -5,6 +5,7 @@ import clsx from 'clsx'
 import api from '../lib/api'
 import HorarioPanel from '../components/horarios/HorarioPanel'
 import ModificacionPanel from '../components/horarios/ModificacionPanel'
+import { useDisciplinas } from '../hooks/useDisciplinas'
 
 const DIAS_SEMANA = [
   { val: 'lun', label: 'Lunes',     dow: 1 },
@@ -18,13 +19,10 @@ const DIAS_SEMANA = [
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
 const MESES_CORTO = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 
-const DISC_LABEL = { CF: 'CrossFit', HF: 'Heavy', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus' }
-const DISC_COLOR = { CF: '#3b82f6', HF: '#22c55e', HX: '#eab308', TN: '#a855f7', KD: '#ec4899', BP: '#0ea5e9' }
-const DISC_ORDER = { CF: 0, HX: 1, HF: 2, TN: 3, KD: 4, BP: 5 }
-
-function sortDisc(a, b) {
-  return (DISC_ORDER[a.disciplina] ?? 99) - (DISC_ORDER[b.disciplina] ?? 99)
-}
+// Fallbacks en caso de que la API no haya cargado aún
+const DISC_LABEL_FB = { CF: 'CrossFit', HF: 'Heavy', HX: 'Hyrox', FB: 'FullBody', TN: 'Teens', KD: 'Kids', BP: 'Bonus' }
+const DISC_COLOR_FB = { CF: '#3b82f6', HF: '#22c55e', HX: '#eab308', FB: '#f97316', TN: '#a855f7', KD: '#ec4899', BP: '#0ea5e9' }
+const DISC_ORDER_FB = { CF: 0, HX: 1, FB: 2, HF: 3, TN: 4, KD: 5, BP: 6 }
 
 const SEDES = [
   { val: '107', label: 'Athlon 107' },
@@ -48,7 +46,7 @@ function addDays(date, n) {
 }
 
 function toISO(date) {
-  return date.toISOString().slice(0, 10)
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
 }
 
 function fmtCorto(date) {
@@ -67,6 +65,19 @@ export default function HorariosPage() {
   const [lunes,  setLunes]  = useState(() => lunesDe(new Date()))
   const [panel,  setPanel]  = useState(null)
   const [modPanel, setModPanel] = useState(null)  // { horario, fecha } | null
+
+  // Disciplinas dinámicas
+  const { discs, labelMap: apiLabelMap, colorMap: apiColorMap } = useDisciplinas()
+  const DISC_LABEL = { ...DISC_LABEL_FB, ...apiLabelMap }
+  const DISC_COLOR = { ...DISC_COLOR_FB, ...apiColorMap }
+  // Orden dinámico: construir mapa desde el campo `orden` de la API
+  const DISC_ORDER = discs.length > 0
+    ? Object.fromEntries(discs.map(d => [d.codigo, d.orden]))
+    : DISC_ORDER_FB
+
+  function sortDisc(a, b) {
+    return (DISC_ORDER[a.disciplina] ?? 99) - (DISC_ORDER[b.disciplina] ?? 99)
+  }
   const qc = useQueryClient()
 
   const semanaISO = toISO(lunes)
@@ -335,6 +346,8 @@ export default function HorariosPage() {
                               horario={h}
                               modificacion={mod}
                               mesBorder={esMesB}
+                              discLabel={DISC_LABEL}
+                              discColor={DISC_COLOR}
                               onModificar={() => setModPanel({ horario: h, fecha, mod })}
                               onEliminarMod={() => eliminarMod(mod.id)}
                             />
@@ -400,6 +413,8 @@ export default function HorariosPage() {
                                 key={h.id}
                                 horario={h}
                                 modoMaestra
+                                discLabel={DISC_LABEL}
+                                discColor={DISC_COLOR}
                                 onEdit={() => setPanel({ horario: h })}
                                 onDelete={() => eliminarMaestro(h.id)}
                               />
@@ -459,8 +474,8 @@ export default function HorariosPage() {
 }
 
 // ── Card compacta ─────────────────────────────────────────────────────────────
-function ClaseCardCompacta({ horario: h, modificacion: mod, modoMaestra, mesBorder, onEdit, onDelete, onModificar, onEliminarMod }) {
-  const color = DISC_COLOR[h.disciplina] || '#6b7280'
+function ClaseCardCompacta({ horario: h, modificacion: mod, modoMaestra, mesBorder, discLabel = DISC_LABEL_FB, discColor = DISC_COLOR_FB, onEdit, onDelete, onModificar, onEliminarMod }) {
+  const color = discColor[h.disciplina] || '#6b7280'
   const esCancelada = mod?.cancelada === true
   const profeNombre = esCancelada ? null : (mod?.profe_real_nombre ?? h.profe_nombre)
   const hayCambio   = mod && !esCancelada && (mod.profe_real !== h.profe)
@@ -475,7 +490,7 @@ function ClaseCardCompacta({ horario: h, modificacion: mod, modoMaestra, mesBord
           <div className="flex items-center gap-1">
             <Ban size={10} className="text-red-400 flex-shrink-0"/>
             <span className="text-xs font-semibold text-red-400 line-through">
-              {DISC_LABEL[h.disciplina] || h.disciplina}
+              {discLabel[h.disciplina] || h.disciplina}
             </span>
           </div>
           <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
@@ -508,7 +523,7 @@ function ClaseCardCompacta({ horario: h, modificacion: mod, modoMaestra, mesBord
           className="text-xs font-semibold px-1 rounded leading-tight"
           style={{ color, backgroundColor: color + '25' }}
         >
-          {DISC_LABEL[h.disciplina] || h.disciplina}
+          {discLabel[h.disciplina] || h.disciplina}
         </span>
 
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">

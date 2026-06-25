@@ -11,6 +11,7 @@ import { money } from '../lib/format'
 import CommandPalette from '../components/ui/CommandPalette'
 import FichaAlumnoPanel from '../components/alumnos/FichaAlumnoPanel'
 import SlidePanel from '../components/ui/SlidePanel'
+import { useDisciplinas } from '../hooks/useDisciplinas'
 
 const TABS = [
   // "Al día" = todos los activos (el estado ya indica que están al corriente)
@@ -36,6 +37,15 @@ function mesesRecientes() {
   return opts.reverse() // más reciente primero
 }
 
+// Default al mes anterior si estamos en los primeros 10 días del mes
+function mesPorDefecto() {
+  const hoy = new Date()
+  const ref = hoy.getDate() <= 10
+    ? new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)
+    : hoy
+  return format(new Date(ref.getFullYear(), ref.getMonth(), 1), 'yyyy-MM-dd')
+}
+
 const RANGOS_DIAS = [
   { id: 'todos',  label: 'Todos',      min: 0,   max: 9999 },
   { id: 'r30',    label: '30-90 días', min: 30,  max: 90 },
@@ -46,7 +56,7 @@ const DISC_ORDER = ['CF', 'HF', 'HX', 'TN', 'KD', 'FB']
 const FREQ_ORDER = ['2x', '3x', '5x', 'libre']
 const FREQ_LBL   = { '2x': '2×', '3x': '3×', '5x': '5×', libre: 'libre' }
 
-const DISC_LABEL = { CF: 'CF', HF: 'HF', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus' }
+const DISC_LABEL = { CF: 'CF', HF: 'HF', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus', FB: 'FullBody' }
 const DISC_BADGE = {
   CF: 'bg-blue-900/70 text-blue-200',
   HF: 'bg-green-900/70 text-green-200',
@@ -54,6 +64,7 @@ const DISC_BADGE = {
   TN: 'bg-purple-900/70 text-purple-200',
   KD: 'bg-pink-900/70 text-pink-200',
   BP: 'bg-sky-900/70 text-sky-200',
+  FB: 'bg-orange-900/70 text-orange-200',
 }
 const ESTADO_DOT = {
   activo: 'bg-green-400', mora: 'bg-yellow-400',
@@ -83,15 +94,15 @@ function agruparPagosPorHorario(pagos) {
 // ─── Fila de pago (tab Por mes) ────────────────────────────────────────────────
 const METODO_ICON = { efectivo: '💵', transferencia: '📲', debito: '💳' }
 
-function PagoRow({ pago }) {
+function PagoRow({ pago, badgeMap = DISC_BADGE, labelMap = DISC_LABEL }) {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 bg-dark-surface rounded-xl">
       <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <span className="font-medium text-dark-text text-sm">{pago.alumno_nombre}</span>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <span className={clsx('text-xs font-semibold px-1.5 py-0.5 rounded-md', DISC_BADGE[pago.alumno_disciplina])}>
-            {DISC_LABEL[pago.alumno_disciplina]}
+          <span className={clsx('text-xs font-semibold px-1.5 py-0.5 rounded-md', badgeMap[pago.alumno_disciplina] || 'bg-gray-700 text-gray-200')}>
+            {labelMap[pago.alumno_disciplina] || pago.alumno_disciplina}
           </span>
           <span className="text-xs text-dark-muted">{pago.alumno_frecuencia}</span>
         </div>
@@ -108,7 +119,7 @@ function PagoRow({ pago }) {
   )
 }
 
-function GrupoPorMes({ hora, pagos }) {
+function GrupoPorMes({ hora, pagos, badgeMap = DISC_BADGE, labelMap = DISC_LABEL }) {
   const [collapsed, setCollapsed] = useState(false)
   const total = pagos.reduce((s, p) => s + Number(p.monto), 0)
 
@@ -130,8 +141,8 @@ function GrupoPorMes({ hora, pagos }) {
         <span className="text-dark-muted font-mono text-xs w-12">{hora}</span>
         <div className="flex gap-1.5">
           {Object.entries(porDisc).map(([disc, count]) => (
-            <span key={disc} className={clsx('text-xs font-semibold px-1.5 py-0.5 rounded-md', DISC_BADGE[disc])}>
-              {DISC_LABEL[disc]} {count}
+            <span key={disc} className={clsx('text-xs font-semibold px-1.5 py-0.5 rounded-md', badgeMap[disc] || 'bg-gray-700 text-gray-200')}>
+              {labelMap[disc] || disc} {count}
             </span>
           ))}
         </div>
@@ -150,7 +161,7 @@ function GrupoPorMes({ hora, pagos }) {
             transition={{ duration: 0.18 }}
             className="overflow-hidden mt-1 space-y-1 pl-2"
           >
-            {pagos.map((p) => <PagoRow key={p.id} pago={p} />)}
+            {pagos.map((p) => <PagoRow key={p.id} pago={p} badgeMap={badgeMap} labelMap={labelMap} />)}
           </motion.div>
         )}
       </AnimatePresence>
@@ -296,7 +307,7 @@ function PanelMensaje({ alumno, open, onClose }) {
   )
 }
 
-function AlumnoRow({ alumno, onPago, onMensaje, esImpago }) {
+function AlumnoRow({ alumno, onPago, onMensaje, esImpago, badgeMap = DISC_BADGE, labelMap = DISC_LABEL }) {
   const ultimoPago = alumno.ultimo_pago
 
   return (
@@ -318,8 +329,8 @@ function AlumnoRow({ alumno, onPago, onMensaje, esImpago }) {
           <span className="font-medium text-dark-text text-sm truncate">{alumno.nombre_completo}</span>
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <span className={clsx('text-xs font-semibold px-1.5 py-0.5 rounded-md', DISC_BADGE[alumno.disciplina])}>
-            {DISC_LABEL[alumno.disciplina]}
+          <span className={clsx('text-xs font-semibold px-1.5 py-0.5 rounded-md', badgeMap[alumno.disciplina] || 'bg-gray-700 text-gray-200')}>
+            {labelMap[alumno.disciplina] || alumno.disciplina}
           </span>
           <span className="text-xs text-dark-muted">{alumno.frecuencia}</span>
           {alumno.bonus_pack && (
@@ -400,7 +411,7 @@ function AlumnoRow({ alumno, onPago, onMensaje, esImpago }) {
   )
 }
 
-function GrupoHorario({ hora, alumnos, onPago, onMensaje, esImpago }) {
+function GrupoHorario({ hora, alumnos, onPago, onMensaje, esImpago, badgeMap = DISC_BADGE, labelMap = DISC_LABEL }) {
   const [collapsed, setCollapsed] = useState(false)
 
   const porDisc = alumnos.reduce((acc, a) => {
@@ -421,8 +432,8 @@ function GrupoHorario({ hora, alumnos, onPago, onMensaje, esImpago }) {
         <span className="text-dark-muted font-mono text-xs w-12">{hora}</span>
         <div className="flex gap-1.5">
           {Object.entries(porDisc).map(([disc, count]) => (
-            <span key={disc} className={clsx('text-xs font-semibold px-1.5 py-0.5 rounded-md', DISC_BADGE[disc])}>
-              {DISC_LABEL[disc]} {count}
+            <span key={disc} className={clsx('text-xs font-semibold px-1.5 py-0.5 rounded-md', badgeMap[disc] || 'bg-gray-700 text-gray-200')}>
+              {labelMap[disc] || disc} {count}
             </span>
           ))}
         </div>
@@ -439,7 +450,7 @@ function GrupoHorario({ hora, alumnos, onPago, onMensaje, esImpago }) {
             className="overflow-hidden mt-1 space-y-1 pl-2"
           >
             {alumnos.map((a) => (
-              <AlumnoRow key={a.id} alumno={a} onPago={onPago} onMensaje={onMensaje} esImpago={esImpago} />
+              <AlumnoRow key={a.id} alumno={a} onPago={onPago} onMensaje={onMensaje} esImpago={esImpago} badgeMap={badgeMap} labelMap={labelMap} />
             ))}
           </motion.div>
         )}
@@ -451,6 +462,13 @@ function GrupoHorario({ hora, alumnos, onPago, onMensaje, esImpago }) {
 const MESES_RECIENTES = mesesRecientes()
 
 export default function AlumnosPage() {
+  // Disciplinas dinámicas desde la API
+  const { discs, labelMap: apiLabelMap, badgeMap: apiBadgeMap } = useDisciplinas()
+  const labelMap = { ...DISC_LABEL, ...apiLabelMap }
+  const badgeMap = { ...DISC_BADGE, ...apiBadgeMap }
+  // Orden dinámico: usar el de la API si está disponible, sino el hardcodeado
+  const discOrder = discs.length > 0 ? discs.map(d => d.codigo) : DISC_ORDER
+
   const [tabActiva, setTabActiva]   = useState('activo')
   const [busqueda, setBusqueda]     = useState('')
   const [sede, setSede]             = useState('')
@@ -460,7 +478,7 @@ export default function AlumnosPage() {
   const [cmdOpen, setCmdOpen]       = useState(false)
   const [pagoAlumno, setPagoAlumno] = useState(null)
   const [msgAlumno, setMsgAlumno]   = useState(null)
-  const [mesPago, setMesPago]       = useState(MESES_RECIENTES[0].value)
+  const [mesPago, setMesPago]       = useState(mesPorDefecto)
 
   const tabConfig = TABS.find((t) => t.id === tabActiva)
   const esPorMes  = tabActiva === 'pormes'
@@ -492,12 +510,15 @@ export default function AlumnosPage() {
     },
   })
 
-  // Chips nivel 1: disciplinas disponibles con conteo
+  // Chips nivel 1: disciplinas disponibles con conteo (orden dinámico)
   const discsDisponibles = useMemo(() => {
     const map = {}
     ;(data || []).forEach(a => { map[a.disciplina] = (map[a.disciplina] || 0) + 1 })
-    return DISC_ORDER.filter(d => map[d]).map(d => ({ disc: d, count: map[d] }))
-  }, [data])
+    // Primero los del orden conocido, luego cualquier extra no conocido
+    const conocidas = discOrder.filter(d => map[d]).map(d => ({ disc: d, count: map[d] }))
+    const extras = Object.keys(map).filter(d => !discOrder.includes(d)).map(d => ({ disc: d, count: map[d] }))
+    return [...conocidas, ...extras]
+  }, [data, discOrder])
 
   // Chips nivel 2: frecuencias dentro de la disciplina seleccionada
   const freqsDisponibles = useMemo(() => {
@@ -806,7 +827,7 @@ export default function AlumnosPage() {
                   <span className="text-lg font-bold text-green-400">{money(totalPagos)}</span>
                 </div>
                 {gruposPagos.map(([hora, pagoGrupo]) => (
-                  <GrupoPorMes key={hora} hora={hora} pagos={pagoGrupo} />
+                  <GrupoPorMes key={hora} hora={hora} pagos={pagoGrupo} badgeMap={badgeMap} labelMap={labelMap} />
                 ))}
               </motion.div>
             </AnimatePresence>
@@ -838,7 +859,7 @@ export default function AlumnosPage() {
                 transition={{ duration: 0.15 }}
               >
                 {grupos.map(([hora, alumnosGrupo]) => (
-                  <GrupoHorario key={hora} hora={hora} alumnos={alumnosGrupo} onPago={abrirPago} onMensaje={abrirMensaje} esImpago={tabActiva === 'mora'} />
+                  <GrupoHorario key={hora} hora={hora} alumnos={alumnosGrupo} onPago={abrirPago} onMensaje={abrirMensaje} esImpago={tabActiva === 'mora'} badgeMap={badgeMap} labelMap={labelMap} />
                 ))}
               </motion.div>
             </AnimatePresence>

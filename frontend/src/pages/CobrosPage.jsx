@@ -18,9 +18,14 @@ const DISC_ORDER = ['CF', 'HF', 'HX', 'TN', 'KD', 'FB']
 const FREQ_ORDER = ['2x', '3x', '5x', 'libre']
 const FREQ_LBL   = { '2x': '2×', '3x': '3×', '5x': '5×', libre: 'libre' }
 
-function mesActual() {
+function mesPorDefecto() {
   const hoy = new Date()
-  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+  // Si estamos en los primeros 10 días del mes, defaultear al mes anterior
+  // (el mes corriente todavía tiene pocos pagos cargados)
+  const ref = hoy.getDate() <= 10
+    ? new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)
+    : hoy
+  return `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`
 }
 
 function mesLabel(mes) {
@@ -294,7 +299,7 @@ function LiquidacionDayTab({ mes }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CobrosPage() {
   const qc = useQueryClient()
-  const [mes, setMes] = useState(mesActual)
+  const [mes, setMes] = useState(mesPorDefecto)
   const [tab, setTab] = useState('todos')
   const [sedeFilter, setSedeFilter] = useState('')
   const [discFilter, setDiscFilter] = useState('')

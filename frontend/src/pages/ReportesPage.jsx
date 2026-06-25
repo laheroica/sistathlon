@@ -6,7 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ReferenceLine, ResponsiveContainer,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/api'
 
@@ -82,6 +82,134 @@ function VarChip({ value, label }) {
       {pos ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
       {pos ? '+' : ''}{value}% {label}
     </div>
+  )
+}
+
+function mesActualKey() {
+  const hoy = new Date()
+  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+}
+
+function ReportePersonalizado() {
+  const [sede, setSede] = useState('')
+  const [mes, setMes]   = useState(mesActualKey())
+  const [seleccionadas, setSeleccionadas] = useState([])
+  const [grupoAbierto, setGrupoAbierto] = useState(null)
+
+  const { data: discData } = useQuery({
+    queryKey: ['disciplinas-config'],
+    queryFn: () => api.get('/disciplinas/').then(r => r.data),
+    staleTime: 1000 * 60 * 10,
+  })
+  const disciplinas = (discData?.results ?? discData ?? []).filter(d => d.activo)
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['reportes-personalizado', seleccionadas.join(','), mes, sede],
+    queryFn: () => api.get('/reportes/personalizado/', {
+      params: { disciplinas: seleccionadas.join(','), mes, sede },
+    }).then(r => r.data),
+    enabled: seleccionadas.length > 0,
+    staleTime: 1000 * 60,
+  })
+
+  function toggle(codigo) {
+    setSeleccionadas(s => s.includes(codigo) ? s.filter(c => c !== codigo) : [...s, codigo])
+    setGrupoAbierto(null)
+  }
+
+  const grupos = data?.grupos ?? []
+  const totalAlumnos = data?.total_alumnos ?? 0
+  const totalCobrado = data?.total_cobrado ?? 0
+
+  return (
+    <Card title="Reporte personalizado" sub="Tildá disciplinas y combinalas para ver alumnos y facturación" className="mb-4">
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        <input type="month" value={mes} onChange={e => { setMes(e.target.value); setGrupoAbierto(null) }}
+          className="bg-dark-bg border border-dark-border rounded-lg px-3 py-1.5 text-xs text-dark-text" />
+        <div className="flex gap-1 bg-dark-bg rounded-xl p-1 border border-dark-border">
+          {[['', 'Ambas'], ['107', '107'], ['24', '24']].map(([v, l]) => (
+            <button key={v} onClick={() => { setSede(v); setGrupoAbierto(null) }}
+              className={clsx('px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                sede === v ? 'bg-indigo-700 text-white' : 'text-dark-muted hover:text-dark-text'
+              )}
+            >{l}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-5">
+        {disciplinas.map(d => {
+          const activo = seleccionadas.includes(d.codigo)
+          return (
+            <button key={d.codigo} onClick={() => toggle(d.codigo)}
+              className={clsx('px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                activo ? 'text-white' : 'text-dark-muted border-dark-border hover:text-dark-text'
+              )}
+              style={activo ? { backgroundColor: d.color_hex, borderColor: d.color_hex } : {}}
+            >{d.nombre}</button>
+          )
+        })}
+      </div>
+
+      {seleccionadas.length === 0 ? (
+        <p className="text-sm text-dark-muted">Tildá al menos una disciplina para ver el reporte.</p>
+      ) : isLoading || isFetching ? (
+        <Sk className="h-32" />
+      ) : (
+        <>
+          <div className="space-y-2 mb-4">
+            {grupos.map((g, i) => {
+              const abierto = grupoAbierto === i
+              return (
+                <div key={i} className="bg-dark-bg rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setGrupoAbierto(abierto ? null : i)}
+                    className="w-full flex items-center justify-between text-sm px-3 py-2 hover:bg-dark-border/30 transition-colors"
+                  >
+                    <span className="text-dark-text flex items-center gap-2">
+                      {abierto ? <ChevronUp size={14} className="text-dark-muted" /> : <ChevronDown size={14} className="text-dark-muted" />}
+                      {g.label} {g.tipo === 'combo' && <span className="text-dark-muted text-xs">(combo)</span>}
+                    </span>
+                    <span className="font-semibold text-dark-text">{g.cantidad} alumnos</span>
+                  </button>
+                  {abierto && (
+                    <div className="border-t border-dark-border px-3 py-2">
+                      {g.alumnos.length === 0 ? (
+                        <p className="text-xs text-dark-muted py-1">Sin alumnos en este grupo.</p>
+                      ) : (
+                        <div className="divide-y divide-dark-border/60">
+                          {g.alumnos.map(a => (
+                            <div key={a.id} className="flex items-center justify-between text-xs py-1.5">
+                              <span className="text-dark-text">{a.nombre}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-dark-muted">Sede {a.sede}</span>
+                                <span className={clsx('font-medium', a.monto_pagado > 0 ? 'text-green-400' : 'text-dark-muted')}>
+                                  {a.monto_pagado > 0 ? fmtMoney(a.monto_pagado) : 'Sin pago'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-dark-bg rounded-xl p-4 text-center">
+              <p className="text-xs text-dark-muted mb-1">Total alumnos (sin duplicar)</p>
+              <p className="text-xl font-bold text-sky-400">{totalAlumnos}</p>
+            </div>
+            <div className="bg-dark-bg rounded-xl p-4 text-center">
+              <p className="text-xs text-dark-muted mb-1">Total cobrado</p>
+              <p className="text-xl font-bold text-green-400">{fmtMoney(totalCobrado)}</p>
+            </div>
+          </div>
+        </>
+      )}
+    </Card>
   )
 }
 
@@ -169,6 +297,8 @@ export default function ReportesPage() {
           </div>
         </div>
       </div>
+
+      <ReportePersonalizado />
 
       {/* KPIs — 6 cards en 2 filas */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">

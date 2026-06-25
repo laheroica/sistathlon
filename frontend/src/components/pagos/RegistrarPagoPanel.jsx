@@ -48,7 +48,7 @@ export default function RegistrarPagoPanel({ alumno, open, onClose }) {
   const [filas, setFilas]       = useState([filaVacia()])
   const [fechaPago, setFechaPago] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [metodo, setMetodo]     = useState('efectivo')
-  const [notas: nota, setNota]         = useState('')
+  const [nota, setNota]         = useState('')
 
   // Resetear cuando cambia el alumno o se abre el panel
   useEffect(() => {

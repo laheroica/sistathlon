@@ -7,6 +7,10 @@ from .models import PrecioMes
 
 
 class PrecioMesSerializer(drf_serializers.ModelSerializer):
+    # Acepta cualquier código dinámico de disciplina/frecuencia
+    disciplina = drf_serializers.CharField(max_length=10)
+    frecuencia = drf_serializers.CharField(max_length=10)
+
     class Meta:
         model = PrecioMes
         fields = ['id', 'mes', 'disciplina', 'frecuencia', 'tipo', 'precio']

@@ -2,10 +2,11 @@
 Actualiza el estado de los alumnos según su historial de pagos.
 
 Lógica:
-  - Pagó el mes corriente                → activo
-  - No pagó este mes, pero sí el anterior → mora
-  - No pagó hace 2+ meses                → alejado
-  - Estado 'baja' o 'temporal'           → no se toca
+  - Pagó el mes corriente                          → activo
+  - Días 1-10: pagó el mes anterior (gracia)       → activo  (ventana de pago)
+  - Después del día 10: solo pagó mes anterior     → mora
+  - No pagó hace 2+ meses                          → alejado
+  - Estado 'baja' o 'temporal'                     → no se toca
 
 Uso:
     python manage.py actualizar_estados
@@ -34,6 +35,9 @@ class Command(BaseCommand):
         mes_actual   = date(hoy.year, hoy.month, 1)
         mes_anterior = date(hoy.year, hoy.month - 1, 1) if hoy.month > 1 else date(hoy.year - 1, 12, 1)
 
+        # Del 1 al 10 hay gracia: pagó el mes pasado = todavía activo
+        en_periodo_gracia = hoy.day <= 10
+
         # Solo tocar activo / mora / alejado — respetar baja y temporal
         alumnos = (
             Alumno.objects
@@ -50,7 +54,8 @@ class Command(BaseCommand):
             if ultimo is None or ultimo < mes_anterior:
                 nuevo = 'alejado'
             elif ultimo == mes_anterior:
-                nuevo = 'mora'
+                # dentro de la ventana de pago (1-10) → todavía activo
+                nuevo = 'activo' if en_periodo_gracia else 'mora'
             else:  # ultimo >= mes_actual
                 nuevo = 'activo'
 
@@ -68,6 +73,7 @@ class Command(BaseCommand):
         self.stdout.write(f'\n{prefix}Resultados al {hoy.strftime("%d/%m/%Y")}:')
         self.stdout.write(f'  Mes actual:   {mes_actual.strftime("%m/%Y")}')
         self.stdout.write(f'  Mes anterior: {mes_anterior.strftime("%m/%Y")}')
+        self.stdout.write(f'  Periodo gracia (1-10): {"SI - pagos de mayo cuentan como activo" if en_periodo_gracia else "NO - a partir del 11"}')
         self.stdout.write('')
         if detalle:
             self.stdout.write(f'{prefix}Cambios ({sum(v for k,v in cambios.items() if k != "sin_cambio")}):')
