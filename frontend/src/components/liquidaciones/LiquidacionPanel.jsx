@@ -4,13 +4,19 @@ import clsx from 'clsx'
 import api from '../../lib/api'
 import { money } from '../../lib/format'
 import { abrirPDFLiquidaciones } from '../../lib/liquidacionPDF'
+import { useDisciplinas } from '../../hooks/useDisciplinas'
 
-const DISC_LABEL = { CF: 'CrossFit', HF: 'Heavy', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus' }
-const DISC_COLOR = { CF: '#3b82f6', HF: '#22c55e', HX: '#eab308', TN: '#a855f7', KD: '#ec4899', BP: '#0ea5e9' }
+// Fallback en caso de que el catálogo dinámico de disciplinas no haya cargado aún
+const DISC_LABEL_FB = { CF: 'CrossFit', HF: 'Heavy Funcional', HX: 'Hyrox', FB: 'FullBody', TN: 'Teens', KD: 'Kids', BP: 'Bonus Pack' }
+const DISC_COLOR_FB = { CF: '#3b82f6', HF: '#22c55e', HX: '#eab308', FB: '#f97316', TN: '#a855f7', KD: '#ec4899', BP: '#0ea5e9' }
 
 const HOY = new Date().toISOString().slice(0, 10)   // 'YYYY-MM-DD'
 
 export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onSaved }) {
+  const { labelMap: apiLabelMap, colorMap: apiColorMap } = useDisciplinas()
+  const DISC_LABEL = { ...DISC_LABEL_FB, ...apiLabelMap }
+  const DISC_COLOR = { ...DISC_COLOR_FB, ...apiColorMap }
+
   const clases       = p.clases ?? []
   const dadas        = clases.filter(c => c.fecha <= HOY)
   const proyectadas  = clases.filter(c => c.fecha >  HOY)
@@ -70,7 +76,7 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
   }
 
   function exportar() {
-    abrirPDFLiquidaciones([{ ...p, monto_final: montoNum }], mesLabel)
+    abrirPDFLiquidaciones([{ ...p, monto_final: montoNum }], mesLabel, DISC_LABEL)
   }
 
   async function marcarPagada() {
@@ -211,12 +217,12 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
 
           {/* Clases dadas */}
           {fechasDadas.length > 0 && (
-            <ClasesList titulo="Clases dadas" porFecha={porFechaDadas} fechas={fechasDadas} proyectada={false} />
+            <ClasesList titulo="Clases dadas" porFecha={porFechaDadas} fechas={fechasDadas} proyectada={false} discLabel={DISC_LABEL} discColor={DISC_COLOR} />
           )}
 
           {/* Clases a dar */}
           {fechasProyectadas.length > 0 && (
-            <ClasesList titulo="A dar" porFecha={porFechaProyectadas} fechas={fechasProyectadas} proyectada={true} />
+            <ClasesList titulo="A dar" porFecha={porFechaProyectadas} fechas={fechasProyectadas} proyectada={true} discLabel={DISC_LABEL} discColor={DISC_COLOR} />
           )}
 
           {error && (
@@ -287,7 +293,7 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
 }
 
 // ── Lista de clases agrupadas por fecha ───────────────────────────────────────
-function ClasesList({ titulo, porFecha, fechas, proyectada }) {
+function ClasesList({ titulo, porFecha, fechas, proyectada, discLabel, discColor }) {
   return (
     <div className={clsx(proyectada && 'opacity-50')}>
       <p className={clsx(
@@ -334,11 +340,11 @@ function ClasesList({ titulo, porFecha, fechas, proyectada }) {
                     <span
                       className="px-1.5 py-0.5 rounded font-semibold flex-shrink-0"
                       style={{
-                        color: DISC_COLOR[c.disciplina],
-                        backgroundColor: (DISC_COLOR[c.disciplina] || '#6b7280') + '25'
+                        color: discColor[c.disciplina],
+                        backgroundColor: (discColor[c.disciplina] || '#6b7280') + '25'
                       }}
                     >
-                      {DISC_LABEL[c.disciplina] || c.disciplina}
+                      {discLabel[c.disciplina] || c.disciplina}
                     </span>
                     <span className={clsx(
                       'text-xs flex-shrink-0 font-medium',

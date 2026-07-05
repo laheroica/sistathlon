@@ -1,5 +1,7 @@
 const DIAS_ES = { lun: 'Lunes', mar: 'Martes', mie: 'Miércoles', jue: 'Jueves', vie: 'Viernes', sab: 'Sábado' }
-const DISC_LABEL = { CF: 'CrossFit', HF: 'Heavy Funcional', HX: 'Hyrox', FB: 'Funcional Básico', TN: 'Toning', KD: 'Kickboxing', BP: 'Body Pump' }
+
+// Fallback en caso de que el catálogo dinámico de disciplinas no se haya pasado o cargado
+const DISC_LABEL_FB = { CF: 'CrossFit', HF: 'Heavy Funcional', HX: 'Hyrox', FB: 'FullBody', TN: 'Teens', KD: 'Kids', BP: 'Bonus Pack' }
 
 function estado(p) {
   if (p.pagada)     return { texto: 'PAGADA',     color: '#d97706' }
@@ -7,7 +9,7 @@ function estado(p) {
   return               { texto: 'PENDIENTE',   color: '#6b7280' }
 }
 
-function paginaProfe(p, mesLabel) {
+function paginaProfe(p, mesLabel, discLabel) {
   const clases = [...(p.clases ?? [])].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora))
   const porDia = []
   let diaActual = null
@@ -33,7 +35,7 @@ function paginaProfe(p, mesLabel) {
       ${d.clases.map(c => `
         <tr>
           <td style="padding:4px 10px; font-size:11px; color:#111827;">${c.hora}</td>
-          <td style="padding:4px 10px; font-size:11px; color:#111827;">${DISC_LABEL[c.disciplina] ?? c.disciplina}</td>
+          <td style="padding:4px 10px; font-size:11px; color:#111827;">${discLabel[c.disciplina] ?? c.disciplina}</td>
           <td style="padding:4px 10px; font-size:11px; color:#6b7280;">Athlon ${c.sede}</td>
         </tr>
       `).join('')}
@@ -78,8 +80,13 @@ function paginaProfe(p, mesLabel) {
   `
 }
 
-/** Abre una ventana de impresión con una página por cada profe en `profes`. */
-export function abrirPDFLiquidaciones(profes, mesLabel) {
+/**
+ * Abre una ventana de impresión con una página por cada profe en `profes`.
+ * `discLabelMap` es el catálogo dinámico de disciplinas ({ CF: 'CrossFit', ... }
+ * desde `useDisciplinas()`); si falta algún código, se usa el fallback interno.
+ */
+export function abrirPDFLiquidaciones(profes, mesLabel, discLabelMap = {}) {
+  const discLabel = { ...DISC_LABEL_FB, ...discLabelMap }
   const titulo = profes.length === 1
     ? `Liquidación ${profes[0].profe_nombre} — ${mesLabel}`
     : `Liquidaciones ${mesLabel}`
@@ -123,7 +130,7 @@ export function abrirPDFLiquidaciones(profes, mesLabel) {
   </style>
 </head>
 <body>
-  ${profes.map(p => paginaProfe(p, mesLabel)).join('')}
+  ${profes.map(p => paginaProfe(p, mesLabel, discLabel)).join('')}
   <script>window.onload = () => window.print()<\/script>
 </body>
 </html>`
