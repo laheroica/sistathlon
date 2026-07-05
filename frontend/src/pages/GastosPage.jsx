@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import {
-  Receipt, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Split, RefreshCw, ChevronDown, ChevronUp
+  Receipt, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Split, RefreshCw,
+  ChevronDown, ChevronUp, UserPlus
 } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/api'
 import { money } from '../lib/format'
+import { HOY, montoAcumulado } from '../lib/liquidaciones'
 import GastoFijoPanel from '../components/gastos/GastoFijoPanel'
 import GastoExtraPanel from '../components/gastos/GastoExtraPanel'
 
@@ -103,9 +106,16 @@ export default function GastosPage() {
     staleTime: 0,
   })
 
+  const profesQ = useQuery({
+    queryKey: ['liquidaciones-preview', mes],
+    queryFn: () => api.get('/liquidaciones/preview/', { params: { mes } }).then(r => r.data),
+    staleTime: 0,
+  })
+
   const fijos      = fijosQ.data  ?? []
   const extrasAll  = extrasQ.data ?? []
   const extras     = sede ? extrasAll.filter(g => g.sede === sede) : extrasAll
+  const todosProfes = profesQ.data?.profes ?? []
 
   // ── KPIs ─────────────────────────────────────────────────────────────────────
 
@@ -117,6 +127,18 @@ export default function GastosPage() {
   const extras107   = useMemo(() => extras.filter(g => g.sede === '107').reduce((s, g) => s + g.total, 0), [extras])
   const extras24    = useMemo(() => extras.filter(g => g.sede === '24' ).reduce((s, g) => s + g.total, 0), [extras])
   const totalExtras = extras107 + extras24
+
+  // Acumulado hasta hoy pagado/a pagar a los profes, por sede
+  const profes107     = useMemo(() => todosProfes.reduce((s, p) => s + montoAcumulado(p, '107'), 0), [todosProfes])
+  const profes24      = useMemo(() => todosProfes.reduce((s, p) => s + montoAcumulado(p, '24'),  0), [todosProfes])
+  const totalProfes   = profes107 + profes24
+  const totalProfesFiltrado = sede ? (sede === '107' ? profes107 : profes24) : totalProfes
+  const profesConHoras = useMemo(
+    () => todosProfes
+      .filter(p => (p.clases ?? []).some(c => c.fecha <= HOY && (!sede || c.sede === sede)))
+      .sort((a, b) => a.profe_nombre.localeCompare(b.profe_nombre)),
+    [todosProfes, sede]
+  )
 
   // ── Delete helpers ────────────────────────────────────────────────────────────
 
@@ -198,13 +220,18 @@ export default function GastosPage() {
         <p className="text-sm font-bold text-orange-400 text-right">{money(extras107)}</p>
         <p className="text-sm font-bold text-orange-400 text-right">{money(extras24)}</p>
 
+        {/* Profes */}
+        <p className="text-xs text-dark-muted">Profes</p>
+        <p className="text-sm font-bold text-purple-400 text-right">{money(profes107)}</p>
+        <p className="text-sm font-bold text-purple-400 text-right">{money(profes24)}</p>
+
         {/* Separador */}
         <div className="col-span-3 border-t border-dark-border my-0.5"/>
 
         {/* Total */}
         <p className="text-xs font-semibold text-dark-text">Total egresos</p>
-        <p className="text-base font-bold text-dark-text text-right">{money(total107 + extras107)}</p>
-        <p className="text-base font-bold text-dark-text text-right">{money(total24  + extras24)}</p>
+        <p className="text-base font-bold text-dark-text text-right">{money(total107 + extras107 + profes107)}</p>
+        <p className="text-base font-bold text-dark-text text-right">{money(total24  + extras24  + profes24)}</p>
       </div>
 
       {/* ── Gastos Fijos ────────────────────────────────────────────────────── */}
@@ -287,6 +314,64 @@ export default function GastosPage() {
               ))}
             </div>
           </>
+        )}
+      </div>
+
+      {/* ── Profes ───────────────────────────────────────────────────────────── */}
+      <div className="card p-0 overflow-hidden">
+        <div className="px-5 py-4 border-b border-dark-border flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <UserPlus size={14} className="text-purple-400"/>
+            <p className="text-xs font-semibold text-dark-muted uppercase tracking-wider">Profes</p>
+            {totalProfesFiltrado > 0 && (
+              <span className="text-sm font-bold text-purple-400">{money(totalProfesFiltrado)}</span>
+            )}
+            {profesQ.isFetching && <RefreshCw size={12} className="animate-spin text-dark-muted"/>}
+          </div>
+          <Link
+            to="/liquidaciones"
+            className="flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 font-medium"
+          >
+            Ver liquidaciones
+          </Link>
+        </div>
+
+        {profesConHoras.length === 0 ? (
+          <div className="py-8 text-center text-sm text-dark-muted">
+            Ningún profe tiene clases registradas este mes
+          </div>
+        ) : (
+          <div className="divide-y divide-dark-border">
+            {profesConHoras.map(p => {
+              const p107 = montoAcumulado(p, '107')
+              const p24  = montoAcumulado(p, '24')
+              const totalFila = sede ? (sede === '107' ? p107 : p24) : p107 + p24
+              return (
+                <div key={p.profe_id} className="flex items-center gap-3 px-5 py-3">
+                  <div
+                    className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xs"
+                    style={{ backgroundColor: p.profe_color || '#6b7280' }}
+                  >
+                    {p.profe_nombre.slice(0, 2).toUpperCase()}
+                  </div>
+                  <span className="flex-1 text-sm text-dark-text font-medium truncate">{p.profe_nombre}</span>
+                  {(!sede || sede === '107') && p107 > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-indigo-400 font-semibold">A107</span>
+                      <span className="text-indigo-400 font-bold">{money(p107)}</span>
+                    </div>
+                  )}
+                  {(!sede || sede === '24') && p24 > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-cyan-400 font-semibold">A24</span>
+                      <span className="text-cyan-400 font-bold">{money(p24)}</span>
+                    </div>
+                  )}
+                  <span className="text-sm font-bold text-purple-400 w-24 text-right">{money(totalFila)}</span>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
 

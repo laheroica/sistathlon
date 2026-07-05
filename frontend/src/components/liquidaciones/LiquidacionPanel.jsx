@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { X, Save, CheckCircle, Banknote, Loader2, AlertTriangle, Clock } from 'lucide-react'
+import { X, Save, CheckCircle, Banknote, Loader2, AlertTriangle, Clock, FileDown } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../../lib/api'
 import { money } from '../../lib/format'
+import { abrirPDFLiquidaciones } from '../../lib/liquidacionPDF'
 
 const DISC_LABEL = { CF: 'CrossFit', HF: 'Heavy', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus' }
 const DISC_COLOR = { CF: '#3b82f6', HF: '#22c55e', HX: '#eab308', TN: '#a855f7', KD: '#ec4899', BP: '#0ea5e9' }
@@ -66,6 +67,10 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
     } finally {
       setSaving(false)
     }
+  }
+
+  function exportar() {
+    abrirPDFLiquidaciones([{ ...p, monto_final: montoNum }], mesLabel)
   }
 
   async function marcarPagada() {
@@ -221,6 +226,13 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
 
         {/* Footer */}
         <div className="px-5 py-4 border-t border-dark-border flex-shrink-0 space-y-2">
+          <button
+            onClick={exportar}
+            className="w-full flex items-center justify-center gap-2 bg-dark-bg hover:bg-dark-border border border-dark-border text-dark-text font-medium py-2 rounded-xl transition-colors text-sm"
+          >
+            <FileDown size={15}/> Exportar PDF
+          </button>
+
           {p.pagada ? (
             <div className="flex items-center justify-center gap-2 text-yellow-400 text-sm font-semibold py-2">
               <Banknote size={16}/> Pagada{p.fecha_pago ? ` el ${p.fecha_pago}` : ''}

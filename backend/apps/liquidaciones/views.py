@@ -90,6 +90,9 @@ def calcular_clases_mes(year, month):
             key = (fecha, maestro.hora, maestro.sede, maestro.disciplina)
             real = reales_idx.get(key)
 
+            if real and real.cancelada:
+                continue  # clase cancelada, no contar para nadie
+
             if real and real.profe_real_id:
                 profe_obj = real.profe_real
                 es_mod = True

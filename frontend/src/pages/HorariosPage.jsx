@@ -83,8 +83,12 @@ export default function HorariosPage() {
   const semanaISO = toISO(lunes)
 
   const { data: horarios = [], isLoading } = useQuery({
-    queryKey: ['horarios-maestro', sede],
-    queryFn: () => api.get('/horarios/maestro/', { params: { sede, activo: 'true' } }).then(r => r.data),
+    queryKey: ['horarios-maestro', sede, vista === 'semana' ? semanaISO : null],
+    queryFn: () => {
+      const params = { sede, activo: 'true' }
+      if (vista === 'semana') params.fecha = semanaISO
+      return api.get('/horarios/maestro/', { params }).then(r => r.data)
+    },
   })
 
   const { data: modificaciones = [] } = useQuery({

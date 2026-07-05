@@ -2,11 +2,13 @@ import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DollarSign, ChevronLeft, ChevronRight, CheckCircle, Clock,
-  Banknote, Eye, RefreshCw, TrendingUp, Lock, History, ArrowLeft
+  Banknote, Eye, RefreshCw, TrendingUp, Lock, History, ArrowLeft, FileDown
 } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/api'
 import { money } from '../lib/format'
+import { HOY, montoAcumulado, montoProyectado } from '../lib/liquidaciones'
+import { abrirPDFLiquidaciones } from '../lib/liquidacionPDF'
 import LiquidacionPanel from '../components/liquidaciones/LiquidacionPanel'
 import CierreMesPanel   from '../components/liquidaciones/CierreMesPanel'
 
@@ -26,8 +28,6 @@ const SEDES = [
   { val: '24',  label: 'Athlon 24' },
 ]
 
-const HOY = new Date().toISOString().slice(0, 10)
-
 function mesStr(year, month) {
   return `${year}-${String(month).padStart(2, '0')}`
 }
@@ -35,29 +35,6 @@ function mesStr(year, month) {
 function mesLabel(str) {
   const [y, m] = str.split('-').map(Number)
   return `${MESES_ES[m - 1]} ${y}`
-}
-
-// ── Helpers de cálculo ────────────────────────────────────────────────────────
-
-function montoAcumulado(p, sede) {
-  const clases   = p.clases ?? []
-  const dadas    = clases.filter(c => c.fecha <= HOY)
-  const totalMes = clases.length
-  const n        = sede ? dadas.filter(c => c.sede === sede).length : dadas.length
-  if (n === 0) return 0
-  if (p.tipo_liquidacion === 'hora') return n * p.valor_hora
-  if (p.tipo_liquidacion === 'fijo') return totalMes > 0 ? p.monto_calculado * n / totalMes : 0
-  return 0
-}
-
-function montoProyectado(p, sede) {
-  const clases = p.clases ?? []
-  const total  = clases.length
-  const n      = sede ? clases.filter(c => c.sede === sede).length : total
-  if (n === 0 || total === 0) return 0
-  if (p.tipo_liquidacion === 'hora') return n * p.valor_hora
-  if (p.tipo_liquidacion === 'fijo') return p.monto_calculado * n / total
-  return 0
 }
 
 // ── Página principal ──────────────────────────────────────────────────────────
@@ -117,6 +94,11 @@ export default function LiquidacionesPage() {
 
   // ¿El mes actual ya está cerrado?
   const mesCerrado = todosLos.length > 0 && todosLos.every(p => p.confirmada)
+
+  function exportarPDF() {
+    const label = `${MESES_ES[month - 1]} ${year}`
+    abrirPDFLiquidaciones(todosLos.filter(p => p.clases_dadas > 0), label)
+  }
 
   // ── Vista historial ───────────────────────────────────────────────────────
 
@@ -179,6 +161,14 @@ export default function LiquidacionesPage() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dark-border bg-dark-surface text-dark-muted hover:text-dark-text text-xs font-medium transition-colors">
             <History size={13}/> Historial
           </button>
+
+          {/* Exportar PDF */}
+          {todosLos.length > 0 && (
+            <button onClick={exportarPDF}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dark-border bg-dark-surface text-dark-muted hover:text-dark-text text-xs font-medium transition-colors">
+              <FileDown size={13}/> Exportar PDF
+            </button>
+          )}
 
           {/* Recalcular */}
           <button onClick={() => refetch()} disabled={isFetching}
@@ -269,13 +259,23 @@ export default function LiquidacionesPage() {
           )}
           {confirmadas.length > 0 && (
             <>
-              <p className="text-xs text-dark-muted uppercase tracking-wider font-semibold px-1 pt-3">Confirmadas — pendientes de pago</p>
+              <div className="flex items-center justify-between px-1 pt-3">
+                <p className="text-xs text-dark-muted uppercase tracking-wider font-semibold">Confirmadas — pendientes de pago</p>
+                <p className="text-sm font-bold text-green-400">
+                  {money(confirmadas.reduce((s, p) => s + p.monto_final, 0))}
+                </p>
+              </div>
               {confirmadas.map(p => <ProfeRow key={p.profe_id} profe={p} sede={sede} onVer={() => setPanel(p)} />)}
             </>
           )}
           {pagadas.length > 0 && (
             <>
-              <p className="text-xs text-dark-muted uppercase tracking-wider font-semibold px-1 pt-3">Pagadas</p>
+              <div className="flex items-center justify-between px-1 pt-3">
+                <p className="text-xs text-dark-muted uppercase tracking-wider font-semibold">Pagadas</p>
+                <p className="text-sm font-bold text-yellow-400">
+                  {money(pagadas.reduce((s, p) => s + p.monto_final, 0))}
+                </p>
+              </div>
               {pagadas.map(p => <ProfeRow key={p.profe_id} profe={p} sede={sede} onVer={() => setPanel(p)} />)}
             </>
           )}

@@ -59,7 +59,15 @@ class HorarioMaestroListCreateView(generics.ListCreateAPIView):
         return Response(out, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def get_queryset(self):
-        qs   = HorarioMaestro.objects.select_related('profe').filter(fecha_desde__lte=date.today())
+        # Si se pasa ?fecha=YYYY-MM-DD, devuelve el maestro vigente en esa fecha
+        # (útil para mostrar semanas pasadas con el profe correcto de ese momento)
+        fecha_param = self.request.query_params.get('fecha')
+        try:
+            fecha_ref = date.fromisoformat(fecha_param) if fecha_param else date.today()
+        except ValueError:
+            fecha_ref = date.today()
+
+        qs = HorarioMaestro.objects.select_related('profe').filter(fecha_desde__lte=fecha_ref)
         sede = self.request.query_params.get('sede')
         if sede:
             qs = qs.filter(sede=sede)
