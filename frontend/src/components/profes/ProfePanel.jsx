@@ -70,6 +70,7 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
 
   const tipoLiq = watch('tipo_liquidacion')
   const colorSel = watch('color')
+  const montoPorcentajePreview = (parseFloat(tarifa.porcentaje) || 0) * (parseFloat(tarifa.base) || 0) / 100
 
   async function onSubmit(data) {
     setSaving(true); setError('')
@@ -324,25 +325,41 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
                   </div>
                 )}
                 {(tipoLiq === 'porcentaje' || tipoLiq === 'mixto') && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-dark-muted font-medium mb-1.5">Porcentaje (%)</label>
-                      <input
-                        type="number" step="any" placeholder="50"
-                        value={tarifa.porcentaje}
-                        onChange={e => setTarifa(t => ({ ...t, porcentaje: e.target.value }))}
-                        className="input w-full text-sm"
-                      />
+                  <div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-dark-muted font-medium mb-1.5">Porcentaje (%)</label>
+                        <input
+                          type="number" step="any" placeholder="50"
+                          value={tarifa.porcentaje}
+                          onChange={e => setTarifa(t => ({ ...t, porcentaje: e.target.value }))}
+                          className="input w-full text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-dark-muted font-medium mb-1.5">Base ($)</label>
+                        <input
+                          type="number" step="any" placeholder="0"
+                          value={tarifa.base}
+                          onChange={e => setTarifa(t => ({ ...t, base: e.target.value }))}
+                          className="input w-full text-sm"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs text-dark-muted font-medium mb-1.5">Base ($)</label>
-                      <input
-                        type="number" step="any" placeholder="0"
-                        value={tarifa.base}
-                        onChange={e => setTarifa(t => ({ ...t, base: e.target.value }))}
-                        className="input w-full text-sm"
-                      />
+                    <div className="flex justify-between items-center mt-2 px-1 text-xs">
+                      <span className="text-dark-muted">
+                        {tarifa.porcentaje || 0}% de {money(tarifa.base || 0)}
+                      </span>
+                      <span className="text-green-400 font-bold">= {money(montoPorcentajePreview)}</span>
                     </div>
+                    {tipoLiq === 'mixto' && (
+                      <div className="flex justify-between items-center mt-1 px-1 text-xs border-t border-dark-border pt-1.5">
+                        <span className="text-dark-muted">Horas ({money(tarifa.sueldo_fijo || 0)}) + Porcentaje</span>
+                        <span className="text-dark-text font-bold">
+                          Total = {money((parseFloat(tarifa.sueldo_fijo) || 0) + montoPorcentajePreview)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 
