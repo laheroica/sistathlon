@@ -20,7 +20,7 @@ function paginaProfe(p, mesLabel, discLabel) {
   const est = estado(p)
   const tipo = p.tipo_liquidacion === 'hora'  ? `$${p.valor_hora.toLocaleString('es-AR')}/h`
              : p.tipo_liquidacion === 'fijo'  ? 'Sueldo fijo'
-             : p.tipo_liquidacion === 'mixto' ? `$${p.valor_hora.toLocaleString('es-AR')}/h + %`
+             : p.tipo_liquidacion === 'mixto' ? 'Horas + %'
              : 'Porcentaje'
 
   const bloquePorcentaje = (p.tipo_liquidacion === 'mixto' || (p.tipo_liquidacion === 'porcentaje' && p.base)) ? `

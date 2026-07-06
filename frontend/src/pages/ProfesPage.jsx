@@ -121,7 +121,7 @@ function ProfeCard({ profe: p, onEdit, onDelete, onToggle }) {
     if (p.tipo_liquidacion === 'hora'       && vh.valor_hora)  return `${money(vh.valor_hora)} / hora`
     if (p.tipo_liquidacion === 'fijo'       && vh.sueldo_fijo) return `${money(vh.sueldo_fijo)} fijo`
     if (p.tipo_liquidacion === 'porcentaje' && vh.porcentaje)  return `${vh.porcentaje}% de recaudación`
-    if (p.tipo_liquidacion === 'mixto') return `${money(vh.valor_hora || 0)}/h + ${vh.porcentaje || 0}%`
+    if (p.tipo_liquidacion === 'mixto') return `${money(vh.sueldo_fijo || 0)} + ${vh.porcentaje || 0}%`
     return 'Sin tarifa cargada'
   }
 

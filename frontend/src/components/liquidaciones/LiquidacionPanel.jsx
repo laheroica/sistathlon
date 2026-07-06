@@ -24,11 +24,9 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
   // Montos reales (solo clases dadas)
   const montoDado = p.tipo_liquidacion === 'hora'
     ? Math.round(dadas.length * p.valor_hora)
-    : p.tipo_liquidacion === 'fijo'
-      ? Math.round(p.sueldo_fijo)
-      : p.tipo_liquidacion === 'mixto'
-        ? Math.round(dadas.length * p.valor_hora + (p.monto_porcentaje || 0))
-        : Math.round(p.monto_porcentaje || 0)  // porcentaje: manual si no hay base cargada
+    : (p.tipo_liquidacion === 'fijo' || p.tipo_liquidacion === 'mixto')
+      ? Math.round(p.monto_calculado)  // montos fijos/combo, no escalan con horas dadas
+      : Math.round(p.monto_porcentaje || 0)  // porcentaje: manual si no hay base cargada
 
   const [montoFinal, setMontoFinal] = useState(String(p.monto_final ?? montoDado))
   const [notas, setNotas]           = useState(p.notas ?? '')
@@ -149,8 +147,8 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
             {p.tipo_liquidacion === 'mixto' && (
               <>
                 <div className="flex justify-between">
-                  <span className="text-dark-muted">Valor por clase</span>
-                  <span className="text-dark-text font-semibold">{money(p.valor_hora)}</span>
+                  <span className="text-dark-muted">Horas (monto fijo)</span>
+                  <span className="text-dark-text font-semibold">{money(p.monto_horas)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-dark-muted">Porcentaje</span>
@@ -186,8 +184,8 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
               {p.tipo_liquidacion === 'mixto' && (
                 <>
                   <div className="flex justify-between">
-                    <span className="text-dark-muted">Horas ({dadas.length}h)</span>
-                    <span className="text-dark-text">{money(dadas.length * p.valor_hora)}</span>
+                    <span className="text-dark-muted">Horas (monto fijo)</span>
+                    <span className="text-dark-text">{money(p.monto_horas)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-dark-muted">Porcentaje</span>
@@ -196,10 +194,12 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
                 </>
               )}
               <div className="flex justify-between">
-                <span className="text-dark-muted">Devengado ({dadas.length}h)</span>
+                <span className="text-dark-muted">
+                  {p.tipo_liquidacion === 'mixto' ? 'Total del mes' : `Devengado (${dadas.length}h)`}
+                </span>
                 <span className="text-green-400 font-bold">{money(montoDado)}</span>
               </div>
-              {proyectadas.length > 0 && (p.tipo_liquidacion === 'hora' || p.tipo_liquidacion === 'mixto') && (
+              {proyectadas.length > 0 && p.tipo_liquidacion === 'hora' && (
                 <div className="flex justify-between opacity-50">
                   <span className="text-dark-muted">Proyección total ({clases.length}h)</span>
                   <span className="text-dark-muted">{money(p.monto_calculado)}</span>

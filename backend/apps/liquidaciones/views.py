@@ -151,7 +151,8 @@ def armar_resultado_profe(profe, clases, year, month, liq=None):
     elif tipo == 'fijo':
         monto_calc = sueldo_fijo
     elif tipo == 'mixto':
-        monto_horas = round(count * valor_hora, 2)
+        # "Horas" es un monto fijo cargado a mano por mes (combo), no horas x valor
+        monto_horas = sueldo_fijo
         monto_porcentaje = round(base * porcentaje / 100, 2) if base and porcentaje else 0
         monto_calc = round(monto_horas + monto_porcentaje, 2)
     else:  # porcentaje — 0 si no hay base cargada, para ingresar manual

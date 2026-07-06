@@ -246,7 +246,7 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
                           {tipoLiq === 'hora'       && v.valor_hora  && `${money(v.valor_hora)}/h`}
                           {tipoLiq === 'fijo'       && v.sueldo_fijo && money(v.sueldo_fijo)}
                           {tipoLiq === 'porcentaje' && v.porcentaje  && `${v.porcentaje}% de ${money(v.base ?? 0)}`}
-                          {tipoLiq === 'mixto'      && `${v.valor_hora ? money(v.valor_hora)+'/h' : ''}${v.porcentaje ? ' + '+v.porcentaje+'% de '+money(v.base ?? 0) : ''}`}
+                          {tipoLiq === 'mixto'      && `${v.sueldo_fijo ? money(v.sueldo_fijo) : '$0'}${v.porcentaje ? ' + '+v.porcentaje+'% de '+money(v.base ?? 0) : ''}`}
                         </span>
                       </div>
                     ))}
@@ -299,7 +299,7 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
                 )}
 
                 {/* Valor según tipo */}
-                {(tipoLiq === 'hora' || tipoLiq === 'mixto') && (
+                {tipoLiq === 'hora' && (
                   <div>
                     <label className="block text-xs text-dark-muted font-medium mb-1.5">Valor por hora ($)</label>
                     <input
@@ -310,9 +310,11 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
                     />
                   </div>
                 )}
-                {tipoLiq === 'fijo' && (
+                {(tipoLiq === 'fijo' || tipoLiq === 'mixto') && (
                   <div>
-                    <label className="block text-xs text-dark-muted font-medium mb-1.5">Sueldo fijo ($)</label>
+                    <label className="block text-xs text-dark-muted font-medium mb-1.5">
+                      {tipoLiq === 'mixto' ? 'Horas — monto fijo del mes ($)' : 'Sueldo fijo ($)'}
+                    </label>
                     <input
                       type="number" step="any" placeholder="0"
                       value={tarifa.sueldo_fijo}
