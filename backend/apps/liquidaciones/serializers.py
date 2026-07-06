@@ -11,7 +11,7 @@ class LiquidacionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'profe', 'profe_nombre', 'profe_color',
             'mes', 'tipo_liquidacion',
-            'clases_dadas', 'valor_hora', 'sueldo_fijo', 'porcentaje',
+            'clases_dadas', 'valor_hora', 'sueldo_fijo', 'porcentaje', 'base',
             'monto_calculado', 'monto_final',
             'detalle',
             'confirmada', 'fecha_confirmacion',

@@ -124,6 +124,11 @@ def calcular_clases_mes(year, month):
 
 def armar_resultado_profe(profe, clases, year, month, liq=None):
     """Aplica tarifa y devuelve el dict con todos los datos del profe."""
+    # Si el profe tiene disciplinas_liquidables configuradas, solo esas cuentan
+    # como horas (y son las únicas que se listan/exportan). Vacío = todas.
+    disc_liquidables = profe.disciplinas_liquidables or []
+    if disc_liquidables:
+        clases = [c for c in clases if c['disciplina'] in disc_liquidables]
     count = len(clases)
 
     # Tarifa del mes (o la más reciente si no hay del mes exacto)
@@ -135,14 +140,23 @@ def armar_resultado_profe(profe, clases, year, month, liq=None):
     valor_hora = round(float(vh.valor_hora), 2) if vh else 0
     sueldo_fijo = round(float(vh.sueldo_fijo), 2) if vh and vh.sueldo_fijo else 0
     porcentaje = round(float(vh.porcentaje), 2) if vh and vh.porcentaje else 0
+    base = round(float(vh.base), 2) if vh and vh.base else 0
 
     tipo = profe.tipo_liquidacion
+    monto_horas = 0
+    monto_porcentaje = 0
     if tipo == 'hora':
-        monto_calc = round(count * valor_hora, 2)
+        monto_horas = round(count * valor_hora, 2)
+        monto_calc = monto_horas
     elif tipo == 'fijo':
         monto_calc = sueldo_fijo
-    else:  # porcentaje — requiere dato de recaudación, se deja en 0 para ingresar manual
-        monto_calc = 0
+    elif tipo == 'mixto':
+        monto_horas = round(count * valor_hora, 2)
+        monto_porcentaje = round(base * porcentaje / 100, 2) if base and porcentaje else 0
+        monto_calc = round(monto_horas + monto_porcentaje, 2)
+    else:  # porcentaje — 0 si no hay base cargada, para ingresar manual
+        monto_porcentaje = round(base * porcentaje / 100, 2) if base and porcentaje else 0
+        monto_calc = monto_porcentaje
 
     return {
         'profe_id': profe.id,
@@ -153,6 +167,9 @@ def armar_resultado_profe(profe, clases, year, month, liq=None):
         'valor_hora': valor_hora,
         'sueldo_fijo': sueldo_fijo,
         'porcentaje': porcentaje,
+        'base': base,
+        'monto_horas': monto_horas,
+        'monto_porcentaje': monto_porcentaje,
         'monto_calculado': monto_calc,
         'clases': sorted(clases, key=lambda c: (c['fecha'], c['hora'])),
         # Si ya hay liquidación guardada
@@ -225,22 +242,23 @@ def guardar_liquidacion(request):
     except Profe.DoesNotExist:
         return Response({'error': 'Profe no encontrado'}, status=404)
 
-    # Recalcular detalle fresco
+    # Recalcular detalle fresco (ya filtrado por disciplinas_liquidables del profe)
     por_profe = calcular_clases_mes(year, month)
-    clases = por_profe.get(profe.id, {}).get('clases', [])
-    clases = sorted(clases, key=lambda c: (c['fecha'], c['hora']))
+    clases_raw = por_profe.get(profe.id, {}).get('clases', [])
+    resultado = armar_resultado_profe(profe, clases_raw, year, month)
 
     liq, _ = Liquidacion.objects.get_or_create(profe=profe, mes=mes_date)
 
     liq.tipo_liquidacion = profe.tipo_liquidacion
-    liq.clases_dadas = data.get('clases_dadas', len(clases))
-    liq.valor_hora = data.get('valor_hora', 0)
-    liq.sueldo_fijo = data.get('sueldo_fijo', 0)
-    liq.porcentaje = data.get('porcentaje', 0)
-    liq.monto_calculado = data.get('monto_calculado', 0)
-    liq.monto_final = data.get('monto_final', data.get('monto_calculado', 0))
+    liq.clases_dadas = data.get('clases_dadas', resultado['clases_dadas'])
+    liq.valor_hora = data.get('valor_hora', resultado['valor_hora'])
+    liq.sueldo_fijo = data.get('sueldo_fijo', resultado['sueldo_fijo'])
+    liq.porcentaje = data.get('porcentaje', resultado['porcentaje'])
+    liq.base = data.get('base', resultado['base'])
+    liq.monto_calculado = data.get('monto_calculado', resultado['monto_calculado'])
+    liq.monto_final = data.get('monto_final', data.get('monto_calculado', resultado['monto_calculado']))
     liq.notas = data.get('notas', '')
-    liq.detalle = clases
+    liq.detalle = resultado['clases']
 
     if data.get('confirmar') and not liq.confirmada:
         liq.confirmada = True
@@ -310,39 +328,23 @@ def cerrar_mes(request):
 
     for pid, data in por_profe.items():
         profe = data['profe']
-        clases = sorted(data['clases'], key=lambda c: (c['fecha'], c['hora']))
-
-        vh = (
-            ValorHoraProfe.objects.filter(profe=profe, mes__year=year, mes__month=month).first()
-            or ValorHoraProfe.objects.filter(profe=profe).order_by('-mes').first()
-        )
-        valor_hora  = float(vh.valor_hora)  if vh else 0
-        sueldo_fijo = float(vh.sueldo_fijo) if vh and vh.sueldo_fijo else 0
-        porcentaje  = float(vh.porcentaje)  if vh and vh.porcentaje  else 0
-
-        count = len(clases)
-        tipo  = profe.tipo_liquidacion
-        if tipo == 'hora':
-            monto_calc = round(count * valor_hora, 2)
-        elif tipo == 'fijo':
-            monto_calc = sueldo_fijo
-        else:
-            monto_calc = 0
+        resultado = armar_resultado_profe(profe, data['clases'], year, month)
 
         aj = ajustes.get(pid, {})
-        monto_final = aj.get('monto_final', monto_calc)
+        monto_final = aj.get('monto_final', resultado['monto_calculado'])
         notas       = aj.get('notas', '')
 
         liq, _ = Liquidacion.objects.get_or_create(profe=profe, mes=mes_date)
-        liq.tipo_liquidacion  = tipo
-        liq.clases_dadas      = count
-        liq.valor_hora        = valor_hora
-        liq.sueldo_fijo       = sueldo_fijo
-        liq.porcentaje        = porcentaje
-        liq.monto_calculado   = monto_calc
+        liq.tipo_liquidacion  = resultado['tipo_liquidacion']
+        liq.clases_dadas      = resultado['clases_dadas']
+        liq.valor_hora        = resultado['valor_hora']
+        liq.sueldo_fijo       = resultado['sueldo_fijo']
+        liq.porcentaje        = resultado['porcentaje']
+        liq.base              = resultado['base']
+        liq.monto_calculado   = resultado['monto_calculado']
         liq.monto_final       = monto_final
         liq.notas             = notas
-        liq.detalle           = clases
+        liq.detalle           = resultado['clases']
         if not liq.confirmada:
             liq.confirmada          = True
             liq.fecha_confirmacion  = timezone.now()

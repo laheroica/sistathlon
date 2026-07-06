@@ -4,6 +4,7 @@ import { X, Save, Loader2, Plus } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../../lib/api'
 import { money } from '../../lib/format'
+import { useDisciplinas } from '../../hooks/useDisciplinas'
 
 const SEDES = [
   { val: '107',   label: 'Athlon 107' },
@@ -15,6 +16,7 @@ const TIPOS = [
   { val: 'hora',       label: 'Por hora' },
   { val: 'fijo',       label: 'Sueldo fijo' },
   { val: 'porcentaje', label: '% recaudación' },
+  { val: 'mixto',      label: 'Horas + % recaudación' },
 ]
 
 const COLORES = [
@@ -35,6 +37,9 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
   const [savingTarifa, setSavingTarifa] = useState(false)
   const [errorTarifa,  setErrorTarifa]  = useState('')
   const [okTarifa,     setOkTarifa]     = useState(false)
+  const [discLiquidables, setDiscLiquidables] = useState(profe?.disciplinas_liquidables ?? [])
+
+  const { discs } = useDisciplinas({ soloActivas: true })
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: isEdit ? {
@@ -60,6 +65,7 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
     valor_hora:  vh?.valor_hora  ?? '',
     sueldo_fijo: vh?.sueldo_fijo ?? '',
     porcentaje:  vh?.porcentaje  ?? '',
+    base:        vh?.base        ?? '',
   })
 
   const tipoLiq = watch('tipo_liquidacion')
@@ -68,7 +74,7 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
   async function onSubmit(data) {
     setSaving(true); setError('')
     try {
-      const payload = { ...data, activo: data.activo }
+      const payload = { ...data, activo: data.activo, disciplinas_liquidables: discLiquidables }
       if (isEdit) {
         await api.patch(`/profes/${profe.id}/`, payload)
       } else {
@@ -97,6 +103,7 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
         valor_hora:  tarifa.valor_hora  || null,
         sueldo_fijo: tarifa.sueldo_fijo || null,
         porcentaje:  tarifa.porcentaje  || null,
+        base:        tarifa.base        || null,
       })
       setOkTarifa(true)
       setTimeout(() => setOkTarifa(false), 2000)
@@ -238,7 +245,8 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
                         <span className="text-dark-text font-medium">
                           {tipoLiq === 'hora'       && v.valor_hora  && `${money(v.valor_hora)}/h`}
                           {tipoLiq === 'fijo'       && v.sueldo_fijo && money(v.sueldo_fijo)}
-                          {tipoLiq === 'porcentaje' && v.porcentaje  && `${v.porcentaje}%`}
+                          {tipoLiq === 'porcentaje' && v.porcentaje  && `${v.porcentaje}% de ${money(v.base ?? 0)}`}
+                          {tipoLiq === 'mixto'      && `${v.valor_hora ? money(v.valor_hora)+'/h' : ''}${v.porcentaje ? ' + '+v.porcentaje+'% de '+money(v.base ?? 0) : ''}`}
                         </span>
                       </div>
                     ))}
@@ -256,8 +264,42 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
                   />
                 </div>
 
+                {/* Disciplinas que cuentan como horas (solo hora / mixto) */}
+                {(tipoLiq === 'hora' || tipoLiq === 'mixto') && (
+                  <div>
+                    <label className="block text-xs text-dark-muted font-medium mb-1.5">
+                      Disciplinas que cuentan como horas
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {discs.map(d => {
+                        const activo = discLiquidables.includes(d.codigo)
+                        return (
+                          <button
+                            key={d.codigo}
+                            type="button"
+                            onClick={() => setDiscLiquidables(list =>
+                              activo ? list.filter(c => c !== d.codigo) : [...list, d.codigo]
+                            )}
+                            className={clsx(
+                              'px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors',
+                              activo
+                                ? 'bg-violet-900/30 text-violet-300 border-violet-700/50'
+                                : 'bg-dark-bg text-dark-muted border-dark-border hover:text-dark-text'
+                            )}
+                          >
+                            {d.nombre}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <p className="text-xs text-dark-muted mt-1.5">
+                      Ninguna marcada = cuentan todas las disciplinas.
+                    </p>
+                  </div>
+                )}
+
                 {/* Valor según tipo */}
-                {tipoLiq === 'hora' && (
+                {(tipoLiq === 'hora' || tipoLiq === 'mixto') && (
                   <div>
                     <label className="block text-xs text-dark-muted font-medium mb-1.5">Valor por hora ($)</label>
                     <input
@@ -279,15 +321,26 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
                     />
                   </div>
                 )}
-                {tipoLiq === 'porcentaje' && (
-                  <div>
-                    <label className="block text-xs text-dark-muted font-medium mb-1.5">Porcentaje (%)</label>
-                    <input
-                      type="number" step="any" placeholder="50"
-                      value={tarifa.porcentaje}
-                      onChange={e => setTarifa(t => ({ ...t, porcentaje: e.target.value }))}
-                      className="input w-full text-sm"
-                    />
+                {(tipoLiq === 'porcentaje' || tipoLiq === 'mixto') && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-dark-muted font-medium mb-1.5">Porcentaje (%)</label>
+                      <input
+                        type="number" step="any" placeholder="50"
+                        value={tarifa.porcentaje}
+                        onChange={e => setTarifa(t => ({ ...t, porcentaje: e.target.value }))}
+                        className="input w-full text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-dark-muted font-medium mb-1.5">Base ($)</label>
+                      <input
+                        type="number" step="any" placeholder="0"
+                        value={tarifa.base}
+                        onChange={e => setTarifa(t => ({ ...t, base: e.target.value }))}
+                        className="input w-full text-sm"
+                      />
+                    </div>
                   </div>
                 )}
 

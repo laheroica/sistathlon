@@ -13,6 +13,7 @@ class Liquidacion(models.Model):
     valor_hora = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     sueldo_fijo = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    base = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     monto_calculado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     monto_final = models.DecimalField(max_digits=12, decimal_places=2, default=0)

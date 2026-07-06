@@ -5,7 +5,7 @@ from .models import Profe, ValorHoraProfe
 class ValorHoraSerializer(serializers.ModelSerializer):
     class Meta:
         model  = ValorHoraProfe
-        fields = ['id', 'mes', 'valor_hora', 'sueldo_fijo', 'porcentaje']
+        fields = ['id', 'mes', 'valor_hora', 'sueldo_fijo', 'porcentaje', 'base']
 
 
 class ProfeSerializer(serializers.ModelSerializer):
@@ -15,7 +15,7 @@ class ProfeSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Profe
         fields = [
-            'id', 'nombre', 'color', 'sede', 'tipo_liquidacion',
+            'id', 'nombre', 'color', 'sede', 'tipo_liquidacion', 'disciplinas_liquidables',
             'fecha_inicio', 'activo', 'notas',
             'valores_hora', 'valor_mes_actual',
         ]
@@ -32,5 +32,6 @@ class ProfeSerializer(serializers.ModelSerializer):
             'valor_hora':  float(vh.valor_hora) if vh.valor_hora else None,
             'sueldo_fijo': float(vh.sueldo_fijo) if vh.sueldo_fijo else None,
             'porcentaje':  float(vh.porcentaje)  if vh.porcentaje  else None,
+            'base':        float(vh.base)        if vh.base        else None,
             'mes':         vh.mes.strftime('%Y-%m'),
         }

@@ -6,9 +6,14 @@ export function montoAcumulado(p, sede) {
   const dadas    = clases.filter(c => c.fecha <= HOY)
   const totalMes = clases.length
   const n        = sede ? dadas.filter(c => c.sede === sede).length : dadas.length
+  if (p.tipo_liquidacion === 'fijo') return totalMes > 0 ? p.monto_calculado * n / totalMes : 0
   if (n === 0) return 0
   if (p.tipo_liquidacion === 'hora') return n * p.valor_hora
-  if (p.tipo_liquidacion === 'fijo') return totalMes > 0 ? p.monto_calculado * n / totalMes : 0
+  if (p.tipo_liquidacion === 'mixto') {
+    const horas      = n * p.valor_hora
+    const porcentaje = totalMes > 0 ? (p.monto_porcentaje || 0) * n / totalMes : 0
+    return horas + porcentaje
+  }
   return 0
 }
 
@@ -20,5 +25,10 @@ export function montoProyectado(p, sede) {
   if (n === 0 || total === 0) return 0
   if (p.tipo_liquidacion === 'hora') return n * p.valor_hora
   if (p.tipo_liquidacion === 'fijo') return p.monto_calculado * n / total
+  if (p.tipo_liquidacion === 'mixto') {
+    const horas      = n * p.valor_hora
+    const porcentaje = (p.monto_porcentaje || 0) * n / total
+    return horas + porcentaje
+  }
   return 0
 }

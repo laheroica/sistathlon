@@ -18,9 +18,19 @@ function paginaProfe(p, mesLabel, discLabel) {
     porDia[porDia.length - 1].clases.push(c)
   }
   const est = estado(p)
-  const tipo = p.tipo_liquidacion === 'hora' ? `$${p.valor_hora.toLocaleString('es-AR')}/h`
-             : p.tipo_liquidacion === 'fijo' ? 'Sueldo fijo'
+  const tipo = p.tipo_liquidacion === 'hora'  ? `$${p.valor_hora.toLocaleString('es-AR')}/h`
+             : p.tipo_liquidacion === 'fijo'  ? 'Sueldo fijo'
+             : p.tipo_liquidacion === 'mixto' ? `$${p.valor_hora.toLocaleString('es-AR')}/h + %`
              : 'Porcentaje'
+
+  const bloquePorcentaje = (p.tipo_liquidacion === 'mixto' || (p.tipo_liquidacion === 'porcentaje' && p.base)) ? `
+    <div style="margin-top:14px; padding:10px 14px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; display:flex; justify-content:space-between; font-size:12px;">
+      ${p.tipo_liquidacion === 'mixto' ? `<span><b>Horas:</b> $${(p.monto_horas ?? 0).toLocaleString('es-AR')}</span>` : ''}
+      <span><b>Base:</b> $${(p.base ?? 0).toLocaleString('es-AR')}</span>
+      <span><b>Porcentaje:</b> ${p.porcentaje}%</span>
+      <span><b>Total:</b> $${p.monto_final.toLocaleString('es-AR')}</span>
+    </div>
+  ` : ''
 
   const filasDia = porDia.map(d => {
     const fecha = new Date(d.fecha + 'T12:00:00')
@@ -71,6 +81,7 @@ function paginaProfe(p, mesLabel, discLabel) {
         </thead>
         <tbody>${filasDia}</tbody>
       </table>
+      ${bloquePorcentaje}
 
       <div class="footer-profe">
         <span>Athlon · ${mesLabel}</span>

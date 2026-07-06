@@ -53,6 +53,7 @@ def set_valor_hora(request, profe_id):
             'valor_hora':  request.data.get('valor_hora') or 0,
             'sueldo_fijo': request.data.get('sueldo_fijo') or None,
             'porcentaje':  request.data.get('porcentaje')  or None,
+            'base':        request.data.get('base')        or None,
         }
     )
     return Response(ValorHoraSerializer(vh).data, status=200)

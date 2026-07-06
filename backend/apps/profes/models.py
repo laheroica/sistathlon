@@ -5,6 +5,7 @@ class TipoLiquidacion(models.TextChoices):
     HORA = 'hora', 'Por hora'
     PORCENTAJE = 'porcentaje', 'Porcentaje de recaudación'
     FIJO = 'fijo', 'Sueldo fijo'
+    MIXTO = 'mixto', 'Horas + Porcentaje'
 
 
 PROFES_COLORES = {
@@ -30,6 +31,10 @@ class Profe(models.Model):
         default='ambas'
     )
     tipo_liquidacion = models.CharField(max_length=15, choices=TipoLiquidacion.choices, default=TipoLiquidacion.HORA)
+    disciplinas_liquidables = models.JSONField(
+        default=list, blank=True,
+        help_text='Códigos de disciplina que cuentan como horas para este profe (ej: ["CF","HF"]). Vacío = todas.'
+    )
     fecha_inicio = models.DateField()
     activo = models.BooleanField(default=True)
     notas = models.TextField(blank=True, null=True)
@@ -57,6 +62,8 @@ class ValorHoraProfe(models.Model):
                                        help_text='Solo para Mario u otros con sueldo fijo')
     porcentaje = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True,
                                       help_text='Porcentaje sobre recaudación (ej: 50.00 para Day/Mario)')
+    base = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True,
+                                help_text='Monto sobre el que se calcula el porcentaje (carga manual)')
 
     class Meta:
         verbose_name = 'Valor hora profe'

@@ -16,11 +16,12 @@ import CierreMesPanel   from '../components/liquidaciones/CierreMesPanel'
 const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-const TIPO_LABEL = { hora: 'Por hora', fijo: 'Sueldo fijo', porcentaje: 'Porcentaje' }
+const TIPO_LABEL = { hora: 'Por hora', fijo: 'Sueldo fijo', porcentaje: 'Porcentaje', mixto: 'Horas + %' }
 const TIPO_COLOR = {
   hora:       'text-blue-400 bg-blue-900/30',
   fijo:       'text-green-400 bg-green-900/30',
   porcentaje: 'text-purple-400 bg-purple-900/30',
+  mixto:      'text-amber-400 bg-amber-900/30',
 }
 
 const SEDES = [
