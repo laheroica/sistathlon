@@ -4,9 +4,9 @@ from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.alumnos.permissions import IsSadmin
 from apps.profes.models import Profe, ValorHoraProfe
 from apps.horarios.models import HorarioMaestro, HorarioReal, Feriado
 from .models import Liquidacion
@@ -186,6 +186,7 @@ def armar_resultado_profe(profe, clases, year, month, liq=None):
 # ── Views ─────────────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
+@permission_classes([IsSadmin])
 def preview_liquidacion(request):
     """
     Calcula la liquidación del mes sin guardar.
@@ -223,6 +224,7 @@ def preview_liquidacion(request):
 
 
 @api_view(['POST'])
+@permission_classes([IsSadmin])
 def guardar_liquidacion(request):
     """
     Guarda o actualiza la liquidación de un profe para un mes.
@@ -270,6 +272,7 @@ def guardar_liquidacion(request):
 
 
 @api_view(['POST'])
+@permission_classes([IsSadmin])
 def marcar_pagada(request, pk):
     """PATCH /liquidaciones/{id}/pagar/"""
     try:
@@ -285,6 +288,7 @@ def marcar_pagada(request, pk):
 
 class LiquidacionListView(generics.ListAPIView):
     serializer_class = LiquidacionSerializer
+    permission_classes = [IsSadmin]
     pagination_class = None
 
     def get_queryset(self):
@@ -302,12 +306,13 @@ class LiquidacionListView(generics.ListAPIView):
 class LiquidacionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Liquidacion.objects.select_related('profe').all()
     serializer_class = LiquidacionSerializer
+    permission_classes = [IsSadmin]
 
 
 # ── Cierre de mes ─────────────────────────────────────────────────────────────
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsSadmin])
 def cerrar_mes(request):
     """
     Cierra el mes: crea/actualiza Liquidacion para todos los profes con clases,
@@ -360,7 +365,7 @@ def cerrar_mes(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsSadmin])
 def meses_cerrados(request):
     """
     Lista de meses que tienen al menos una liquidación confirmada.
@@ -387,7 +392,7 @@ def meses_cerrados(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsSadmin])
 def detalle_cierre(request, mes_str):
     """
     Detalle de un mes cerrado: todas las liquidaciones confirmadas.

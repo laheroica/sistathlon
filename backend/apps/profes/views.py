@@ -1,14 +1,14 @@
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from apps.alumnos.permissions import IsSadmin
 from .models import Profe, ValorHoraProfe
 from .serializers import ProfeSerializer, ValorHoraSerializer
 
 
 class ProfeListCreateView(generics.ListCreateAPIView):
     serializer_class   = ProfeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsSadmin]
     pagination_class   = None
 
     def get_queryset(self):
@@ -23,12 +23,12 @@ class ProfeListCreateView(generics.ListCreateAPIView):
 
 class ProfeDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class   = ProfeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsSadmin]
     queryset           = Profe.objects.prefetch_related('valores_hora').all()
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsSadmin])
 def set_valor_hora(request, profe_id):
     """Crea o actualiza el valor/hora de un profe para un mes dado."""
     try:
