@@ -230,11 +230,17 @@ export default function ReportesPage() {
 
   const seriesFiltradas = series.map(s => {
     if (!sede) return s
+    const is107 = sede === '107'
     return {
       ...s,
-      recaudado: sede === '107' ? s.rec_107 : s.rec_24,
-      pagadores: sede === '107' ? s.pag_107 : s.pag_24,
-      ticket:    sede === '107' ? s.ticket_107 : s.ticket_24,
+      recaudado: is107 ? s.rec_107 : s.rec_24,
+      pagadores: is107 ? s.pag_107 : s.pag_24,
+      ticket:    is107 ? s.ticket_107 : s.ticket_24,
+      gastos:    is107 ? s.gastos_107 : s.gastos_24,
+      balance:   is107 ? s.balance_107 : s.balance_24,
+      g_profes:  is107 ? s.g_profes_107 : s.g_profes_24,
+      g_fijos:   is107 ? s.g_fijos_107 : s.g_fijos_24,
+      g_extras:  is107 ? s.g_extras_107 : s.g_extras_24,
     }
   })
 
@@ -267,8 +273,9 @@ export default function ReportesPage() {
   const ticketUltimoMes    = snapshot.ticket_ultimo_mes ?? 0
   const varFacturacion     = snapshot.var_facturacion_pct ?? 0
   const varAlumnos         = snapshot.var_alumnos_pct ?? 0
-  const totalRec           = series.reduce((s, r) => s + r.recaudado, 0)
-  const totalGast          = series.reduce((s, r) => s + r.gastos, 0)
+  const totalRec           = seriesFiltradas.reduce((s, r) => s + r.recaudado, 0)
+  const totalGast          = seriesFiltradas.reduce((s, r) => s + r.gastos, 0)
+  const totalSaldo         = totalRec - totalGast
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -478,7 +485,7 @@ export default function ReportesPage() {
         <Card title="Balance mensual" sub="Ingresos − gastos totales">
           {isLoading ? <Sk className="h-48" /> : (
             <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={series}>
+              <AreaChart data={seriesFiltradas}>
                 <defs>
                   <linearGradient id="balGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor={C.purple} stopOpacity={0.3} />
@@ -497,12 +504,56 @@ export default function ReportesPage() {
         </Card>
       </div>
 
+      {/* Tabla: Ingresos / Egresos / Saldo por mes */}
+      <Card
+        title="Ingresos, egresos y saldo por mes"
+        sub={sede ? `Athlon ${sede}` : 'Ambas sedes'}
+        className="mb-4"
+      >
+        {isLoading ? <Sk className="h-56" /> : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-dark-muted border-b border-dark-border">
+                  <th className="text-left  font-medium py-2 px-3">Mes</th>
+                  <th className="text-right font-medium py-2 px-3">Ingresos</th>
+                  <th className="text-right font-medium py-2 px-3">Egresos</th>
+                  <th className="text-right font-medium py-2 px-3">Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...seriesFiltradas].reverse().map(s => (
+                  <tr key={s.mes_key} className="border-b border-dark-border/50 hover:bg-dark-bg/40">
+                    <td className="py-2 px-3 text-dark-text font-medium capitalize">{s.mes}</td>
+                    <td className="py-2 px-3 text-right text-green-400">{fmtMoney(s.recaudado)}</td>
+                    <td className="py-2 px-3 text-right text-red-400">{fmtMoney(s.gastos)}</td>
+                    <td className={clsx('py-2 px-3 text-right font-bold', s.balance >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      {fmtMoney(s.balance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-dark-border font-bold">
+                  <td className="py-2.5 px-3 text-dark-text">Total {meses}m</td>
+                  <td className="py-2.5 px-3 text-right text-green-400">{fmtMoney(totalRec)}</td>
+                  <td className="py-2.5 px-3 text-right text-red-400">{fmtMoney(totalGast)}</td>
+                  <td className={clsx('py-2.5 px-3 text-right', totalSaldo >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                    {fmtMoney(totalSaldo)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </Card>
+
       {/* Row 4: Gastos desglosados + Variación de alumnos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <Card title="Gastos mensuales desglosados" sub="Profes · Fijos · Extras">
           {isLoading ? <Sk className="h-48" /> : (
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={series} barSize={18}>
+              <BarChart data={seriesFiltradas} barSize={18}>
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                 <XAxis dataKey="mes" tick={TICK} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={fmtMoney} tick={TICK} axisLine={false} tickLine={false} width={52} />

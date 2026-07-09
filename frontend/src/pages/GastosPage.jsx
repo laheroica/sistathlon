@@ -48,7 +48,8 @@ const GRUPOS = [
     conceptos: [
       { val: 'mono_deni',   label: 'Monotributo Deni',    compartido: true },
       { val: 'mono_alvaro', label: 'Monotributo Álvaro',  compartido: true },
-      { val: 'mono_mario',  label: 'Monotributo Mario',   compartido: true },
+      // Mario ya no se carga: solo se muestra en meses que ya tienen datos (legacy)
+      { val: 'mono_mario',  label: 'Monotributo Mario',   compartido: true, legacy: true },
       { val: 'iibb_deni',   label: 'IIBB Deni',           compartido: true },
       { val: 'iibb_alvaro', label: 'IIBB Álvaro',         compartido: true },
       { val: 'iibb_mario',  label: 'IIBB Mario',          compartido: true },
@@ -447,6 +448,9 @@ function GrupoFijos({ grupo, fijos, sede, mes, onAdd, onEdit, onDelete }) {
               ? registros.reduce((s, g) => s + parseFloat(g.importe), 0)
               : visibles.reduce((s, g) => s + parseFloat(g.importe), 0)
 
+            // Conceptos "legacy" (ej. Mario): solo se muestran si el mes tiene datos
+            if (c.legacy && registros.length === 0) return null
+
             return (
               <div key={c.val} className="px-5 py-3">
                 {/* Fila principal */}
@@ -463,12 +467,14 @@ function GrupoFijos({ grupo, fijos, sede, mes, onAdd, onEdit, onDelete }) {
                     <span className="text-xs text-dark-muted">({money(totalVisual / 2)} c/u)</span>
                   )}
 
-                  <button
-                    onClick={() => onAdd(c)}
-                    className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 border border-red-900/40 hover:border-red-800/60 px-2 py-1 rounded-lg transition-colors"
-                  >
-                    <Plus size={11}/> {c.multi ? 'Agregar' : visibles.length > 0 ? 'Otro' : 'Registrar'}
-                  </button>
+                  {!c.legacy && (
+                    <button
+                      onClick={() => onAdd(c)}
+                      className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 border border-red-900/40 hover:border-red-800/60 px-2 py-1 rounded-lg transition-colors"
+                    >
+                      <Plus size={11}/> {c.multi ? 'Agregar' : visibles.length > 0 ? 'Otro' : 'Registrar'}
+                    </button>
+                  )}
                 </div>
 
                 {/* Lista de registros */}
