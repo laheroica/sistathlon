@@ -58,10 +58,18 @@ const GRUPOS = [
 ]
 
 const SEDES = [
-  { val: '', label: 'Ambas sedes' },
+  { val: '', label: 'Todas' },
   { val: '107', label: 'Athlon 107' },
   { val: '24',  label: 'Athlon 24' },
+  { val: 'general', label: 'General' },
 ]
+
+// Etiqueta + color del chip de sede
+function sedeBadge(sd) {
+  if (sd === '107') return { label: 'A107', cls: 'text-indigo-400 bg-indigo-900/30' }
+  if (sd === '24')  return { label: 'A24',  cls: 'text-cyan-400 bg-cyan-900/30' }
+  return { label: 'Gral', cls: 'text-amber-400 bg-amber-900/30' }
+}
 
 function mesStr(y, m) { return `${y}-${String(m).padStart(2, '0')}` }
 function mesLabel(y, m) {
@@ -120,20 +128,27 @@ export default function GastosPage() {
 
   // ── KPIs ─────────────────────────────────────────────────────────────────────
 
-  // Total fijos por sede (cada compartido contribuye su mitad a cada una)
-  const total107  = useMemo(() => fijos.filter(g => g.sede === '107').reduce((s, g) => s + parseFloat(g.importe), 0), [fijos])
-  const total24   = useMemo(() => fijos.filter(g => g.sede === '24' ).reduce((s, g) => s + parseFloat(g.importe), 0), [fijos])
-  const totalFijos = total107 + total24
+  const sumImporte = (arr, sd) => arr.filter(g => g.sede === sd).reduce((s, g) => s + parseFloat(g.importe), 0)
+  const sumTotal   = (arr, sd) => arr.filter(g => g.sede === sd).reduce((s, g) => s + g.total, 0)
 
-  const extras107   = useMemo(() => extras.filter(g => g.sede === '107').reduce((s, g) => s + g.total, 0), [extras])
-  const extras24    = useMemo(() => extras.filter(g => g.sede === '24' ).reduce((s, g) => s + g.total, 0), [extras])
-  const totalExtras = extras107 + extras24
+  // Total fijos por sede (cada compartido contribuye su mitad a cada una)
+  const total107      = useMemo(() => sumImporte(fijos, '107'),     [fijos])
+  const total24       = useMemo(() => sumImporte(fijos, '24'),      [fijos])
+  const totalGeneral  = useMemo(() => sumImporte(fijos, 'general'), [fijos])
+
+  const extras107     = useMemo(() => sumTotal(extrasAll, '107'),     [extrasAll])
+  const extras24      = useMemo(() => sumTotal(extrasAll, '24'),      [extrasAll])
+  const extrasGeneral = useMemo(() => sumTotal(extrasAll, 'general'), [extrasAll])
+  const totalExtras   = extras.reduce((s, g) => s + g.total, 0)   // suma de los visibles (respeta filtro)
 
   // Acumulado hasta hoy pagado/a pagar a los profes, por sede
-  const profes107     = useMemo(() => todosProfes.reduce((s, p) => s + montoAcumulado(p, '107'), 0), [todosProfes])
-  const profes24      = useMemo(() => todosProfes.reduce((s, p) => s + montoAcumulado(p, '24'),  0), [todosProfes])
-  const totalProfes   = profes107 + profes24
-  const totalProfesFiltrado = sede ? (sede === '107' ? profes107 : profes24) : totalProfes
+  const profes107     = useMemo(() => todosProfes.reduce((s, p) => s + montoAcumulado(p, '107'),     0), [todosProfes])
+  const profes24      = useMemo(() => todosProfes.reduce((s, p) => s + montoAcumulado(p, '24'),      0), [todosProfes])
+  const profesGeneral = useMemo(() => todosProfes.reduce((s, p) => s + montoAcumulado(p, 'general'), 0), [todosProfes])
+  const totalProfes   = profes107 + profes24 + profesGeneral
+  const totalProfesFiltrado = sede
+    ? (sede === '107' ? profes107 : sede === '24' ? profes24 : profesGeneral)
+    : totalProfes
   const profesConHoras = useMemo(
     () => todosProfes
       .filter(p =>
@@ -208,34 +223,39 @@ export default function GastosPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-[1fr_100px_100px] gap-x-3 gap-y-1.5 items-center">
+      <div className="grid grid-cols-[1fr_repeat(3,minmax(64px,90px))] gap-x-2 sm:gap-x-3 gap-y-1.5 items-center overflow-x-auto">
         {/* Headers */}
         <div/>
         <p className="text-xs font-semibold text-indigo-400 text-right">A107</p>
         <p className="text-xs font-semibold text-cyan-400 text-right">A24</p>
+        <p className="text-xs font-semibold text-amber-400 text-right">Gral</p>
 
         {/* Fijos */}
         <p className="text-xs text-dark-muted">Gastos fijos</p>
         <p className="text-sm font-bold text-red-400 text-right">{money(total107)}</p>
         <p className="text-sm font-bold text-red-400 text-right">{money(total24)}</p>
+        <p className="text-sm font-bold text-red-400 text-right">{money(totalGeneral)}</p>
 
         {/* Extras */}
         <p className="text-xs text-dark-muted">Gastos extras</p>
         <p className="text-sm font-bold text-orange-400 text-right">{money(extras107)}</p>
         <p className="text-sm font-bold text-orange-400 text-right">{money(extras24)}</p>
+        <p className="text-sm font-bold text-orange-400 text-right">{money(extrasGeneral)}</p>
 
         {/* Profes */}
         <p className="text-xs text-dark-muted">Profes</p>
         <p className="text-sm font-bold text-purple-400 text-right">{money(profes107)}</p>
         <p className="text-sm font-bold text-purple-400 text-right">{money(profes24)}</p>
+        <p className="text-sm font-bold text-purple-400 text-right">{money(profesGeneral)}</p>
 
         {/* Separador */}
-        <div className="col-span-3 border-t border-dark-border my-0.5"/>
+        <div className="col-span-4 border-t border-dark-border my-0.5"/>
 
         {/* Total */}
         <p className="text-xs font-semibold text-dark-text">Total egresos</p>
         <p className="text-base font-bold text-dark-text text-right">{money(total107 + extras107 + profes107)}</p>
         <p className="text-base font-bold text-dark-text text-right">{money(total24  + extras24  + profes24)}</p>
+        <p className="text-base font-bold text-dark-text text-right">{money(totalGeneral + extrasGeneral + profesGeneral)}</p>
       </div>
 
       {/* ── Gastos Fijos ────────────────────────────────────────────────────── */}
@@ -301,10 +321,9 @@ export default function GastosPage() {
                   <span className="text-dark-muted text-right">×{parseFloat(ex.cantidad)}</span>
                   <span className="text-orange-400 font-semibold text-right">{money(ex.total)}</span>
                   <span className="text-center">
-                    <span className={clsx(
-                      'text-xs px-1.5 py-0.5 rounded font-medium',
-                      ex.sede === '107' ? 'text-indigo-400 bg-indigo-900/30' : 'text-cyan-400 bg-cyan-900/30'
-                    )}>A{ex.sede}</span>
+                    <span className={clsx('text-xs px-1.5 py-0.5 rounded font-medium', sedeBadge(ex.sede).cls)}>
+                      {sedeBadge(ex.sede).label}
+                    </span>
                   </span>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
                     <button onClick={() => setPanelExtra(ex)} className="p-1 text-dark-muted hover:text-blue-400">
@@ -349,7 +368,10 @@ export default function GastosPage() {
             {profesConHoras.map(p => {
               const p107 = montoAcumulado(p, '107')
               const p24  = montoAcumulado(p, '24')
-              const totalFila = sede ? (sede === '107' ? p107 : p24) : p107 + p24
+              const pGen = montoAcumulado(p, 'general')
+              const totalFila = sede
+                ? (sede === '107' ? p107 : sede === '24' ? p24 : pGen)
+                : p107 + p24 + pGen
               return (
                 <div key={p.profe_id} className="flex items-center gap-3 px-5 py-3">
                   <div
@@ -369,6 +391,12 @@ export default function GastosPage() {
                     <div className="flex items-center gap-1.5 text-xs">
                       <span className="text-cyan-400 font-semibold">A24</span>
                       <span className="text-cyan-400 font-bold">{money(p24)}</span>
+                    </div>
+                  )}
+                  {(!sede || sede === 'general') && pGen > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-amber-400 font-semibold">Gral</span>
+                      <span className="text-amber-400 font-bold">{money(pGen)}</span>
                     </div>
                   )}
                   <span className="text-sm font-bold text-purple-400 w-24 text-right">{money(totalFila)}</span>
@@ -483,10 +511,9 @@ function GrupoFijos({ grupo, fijos, sede, mes, onAdd, onEdit, onDelete }) {
                     {visibles.map(g => (
                       <div key={g.id} className="flex items-center gap-2 text-xs text-dark-muted group">
                         <span className="text-dark-muted">{g.fecha}</span>
-                        <span className={clsx(
-                          'px-1.5 py-0.5 rounded text-xs font-medium',
-                          g.sede === '107' ? 'text-indigo-400 bg-indigo-900/20' : 'text-cyan-400 bg-cyan-900/20'
-                        )}>A{g.sede}</span>
+                        <span className={clsx('px-1.5 py-0.5 rounded text-xs font-medium', sedeBadge(g.sede).cls)}>
+                          {sedeBadge(g.sede).label}
+                        </span>
                         <span className="font-semibold text-dark-text">{money(g.importe)}</span>
                         {g.notas && <span className="italic truncate max-w-[140px]">{g.notas}</span>}
                         <div className="opacity-0 group-hover:opacity-100 ml-auto flex items-center gap-1 transition-all">

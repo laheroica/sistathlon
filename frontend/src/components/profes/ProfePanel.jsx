@@ -10,6 +10,7 @@ const SEDES = [
   { val: '107',   label: 'Athlon 107' },
   { val: '24',    label: 'Athlon 24' },
   { val: 'ambas', label: 'Ambas sedes' },
+  { val: 'general', label: 'General (gerencia)' },
 ]
 
 const TIPOS = [

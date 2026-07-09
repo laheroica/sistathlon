@@ -241,46 +241,54 @@ def anual(request):
         .annotate(cant=Count('id'), total=Sum('monto'))
     )
 
+    # Helper: acumula un monto en el dict del bucket de sede correspondiente
+    def _acum(d107, d24, dgen, mes, sede, monto):
+        if sede == '107':
+            d107[mes] = d107.get(mes, 0) + monto
+        elif sede == '24':
+            d24[mes] = d24.get(mes, 0) + monto
+        else:  # general
+            dgen[mes] = dgen.get(mes, 0) + monto
+
     # ── Liquidaciones profes (prorrateado por sede según clases del detalle) ───
-    # Sin clases en el detalle (ej. sueldo fijo del dueño) se reparte 50/50,
-    # igual que en la vista de Gastos.
-    liq_by_mes    = {}   # total
-    liq107_by_mes = {}
-    liq24_by_mes  = {}
-    for liq in Liquidacion.objects.filter(mes__in=meses, confirmada=True):
+    # Sin clases (ej. sueldo fijo): según la sede del profe. 'ambas' → 50/50,
+    # 'general' → bucket general, '107'/'24' → esa sede.
+    liq_by_mes    = {}
+    liq107_by_mes = {}; liq24_by_mes = {}; liqgen_by_mes = {}
+    for liq in Liquidacion.objects.filter(mes__in=meses, confirmada=True).select_related('profe'):
         monto = float(liq.monto_final)
         clases = liq.detalle or []
+        liq_by_mes[liq.mes] = liq_by_mes.get(liq.mes, 0) + monto
         if clases:
             n107 = sum(1 for c in clases if c.get('sede') == '107')
             n24  = sum(1 for c in clases if c.get('sede') == '24')
             total = len(clases)
-            m107 = monto * n107 / total
-            m24  = monto * n24 / total
+            liq107_by_mes[liq.mes] = liq107_by_mes.get(liq.mes, 0) + monto * n107 / total
+            liq24_by_mes[liq.mes]  = liq24_by_mes.get(liq.mes, 0) + monto * n24 / total
         else:
-            m107 = m24 = monto / 2
-        liq_by_mes[liq.mes]    = liq_by_mes.get(liq.mes, 0) + monto
-        liq107_by_mes[liq.mes] = liq107_by_mes.get(liq.mes, 0) + m107
-        liq24_by_mes[liq.mes]  = liq24_by_mes.get(liq.mes, 0) + m24
+            sede_p = liq.profe.sede
+            if sede_p == 'general':
+                liqgen_by_mes[liq.mes] = liqgen_by_mes.get(liq.mes, 0) + monto
+            elif sede_p in ('107', '24'):
+                _acum(liq107_by_mes, liq24_by_mes, liqgen_by_mes, liq.mes, sede_p, monto)
+            else:  # ambas
+                liq107_by_mes[liq.mes] = liq107_by_mes.get(liq.mes, 0) + monto / 2
+                liq24_by_mes[liq.mes]  = liq24_by_mes.get(liq.mes, 0) + monto / 2
 
     # ── Gastos fijos (por sede; los compartidos ya vienen divididos ÷2) ────────
     gfijo_by_mes    = {}
-    gfijo107_by_mes = {}
-    gfijo24_by_mes  = {}
+    gfijo107_by_mes = {}; gfijo24_by_mes = {}; gfijogen_by_mes = {}
     for row in (
         GastoFijo.objects.filter(mes__in=meses)
         .values('mes', 'sede').annotate(total=Sum('importe'))
     ):
         t = float(row['total'])
         gfijo_by_mes[row['mes']] = gfijo_by_mes.get(row['mes'], 0) + t
-        if row['sede'] == '107':
-            gfijo107_by_mes[row['mes']] = gfijo107_by_mes.get(row['mes'], 0) + t
-        elif row['sede'] == '24':
-            gfijo24_by_mes[row['mes']] = gfijo24_by_mes.get(row['mes'], 0) + t
+        _acum(gfijo107_by_mes, gfijo24_by_mes, gfijogen_by_mes, row['mes'], row['sede'], t)
 
     # ── Gastos extras (precio_unitario * cantidad, por sede) ──────────────────
     gextra_by_mes    = {}
-    gextra107_by_mes = {}
-    gextra24_by_mes  = {}
+    gextra107_by_mes = {}; gextra24_by_mes = {}; gextragen_by_mes = {}
     for row in (
         GastoExtra.objects.filter(mes__in=meses)
         .annotate(subtotal=ExpressionWrapper(
@@ -292,10 +300,7 @@ def anual(request):
     ):
         t = float(row['total'])
         gextra_by_mes[row['mes']] = gextra_by_mes.get(row['mes'], 0) + t
-        if row['sede'] == '107':
-            gextra107_by_mes[row['mes']] = gextra107_by_mes.get(row['mes'], 0) + t
-        elif row['sede'] == '24':
-            gextra24_by_mes[row['mes']] = gextra24_by_mes.get(row['mes'], 0) + t
+        _acum(gextra107_by_mes, gextra24_by_mes, gextragen_by_mes, row['mes'], row['sede'], t)
 
     # ── Nuevos alumnos por mes ────────────────────────────────────────────────
     nuevos_by_mes = {}
@@ -323,12 +328,13 @@ def anual(request):
         ge = gextra_by_mes.get(mes, 0)
         gt = gp + gf + ge
 
-        # Gastos por sede
-        gp107 = liq107_by_mes.get(mes, 0);  gp24 = liq24_by_mes.get(mes, 0)
-        gf107 = gfijo107_by_mes.get(mes, 0); gf24 = gfijo24_by_mes.get(mes, 0)
-        ge107 = gextra107_by_mes.get(mes, 0); ge24 = gextra24_by_mes.get(mes, 0)
+        # Gastos por sede (107 / 24 / general)
+        gp107 = liq107_by_mes.get(mes, 0);  gp24 = liq24_by_mes.get(mes, 0);  gpgen = liqgen_by_mes.get(mes, 0)
+        gf107 = gfijo107_by_mes.get(mes, 0); gf24 = gfijo24_by_mes.get(mes, 0); gfgen = gfijogen_by_mes.get(mes, 0)
+        ge107 = gextra107_by_mes.get(mes, 0); ge24 = gextra24_by_mes.get(mes, 0); gegen = gextragen_by_mes.get(mes, 0)
         gt107 = gp107 + gf107 + ge107
         gt24  = gp24  + gf24  + ge24
+        gtgen = gpgen + gfgen + gegen
 
         series.append({
             'mes':        mes.strftime('%b %y'),
@@ -350,11 +356,17 @@ def anual(request):
             # Gastos y balance por sede
             'gastos_107':  round(gt107),
             'gastos_24':   round(gt24),
-            'g_profes_107': round(gp107), 'g_profes_24': round(gp24),
-            'g_fijos_107':  round(gf107), 'g_fijos_24':  round(gf24),
-            'g_extras_107': round(ge107), 'g_extras_24': round(ge24),
+            'gastos_general': round(gtgen),
+            'g_profes_107': round(gp107), 'g_profes_24': round(gp24), 'g_profes_general': round(gpgen),
+            'g_fijos_107':  round(gf107), 'g_fijos_24':  round(gf24),  'g_fijos_general':  round(gfgen),
+            'g_extras_107': round(ge107), 'g_extras_24': round(ge24),  'g_extras_general': round(gegen),
             'balance_107': round(r107['total'] - gt107),
             'balance_24':  round(r24['total'] - gt24),
+            # General no tiene ingresos propios; su "balance" es el gasto en negativo
+            'rec_general':     0,
+            'pag_general':     0,
+            'ticket_general':  0,
+            'balance_general': round(-gtgen),
             'nuevos':     nuevos_by_mes.get(mes, 0),
         })
 

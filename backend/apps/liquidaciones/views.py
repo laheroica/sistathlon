@@ -178,6 +178,7 @@ def armar_resultado_profe(profe, clases, year, month, liq=None):
         'profe_id': profe.id,
         'profe_nombre': profe.nombre,
         'profe_color': profe.color,
+        'sede': profe.sede,
         'tipo_liquidacion': tipo,
         'clases_dadas': count,
         'valor_hora': valor_hora,

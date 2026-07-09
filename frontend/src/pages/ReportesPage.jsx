@@ -230,17 +230,17 @@ export default function ReportesPage() {
 
   const seriesFiltradas = series.map(s => {
     if (!sede) return s
-    const is107 = sede === '107'
+    const suf = sede === '107' ? '_107' : sede === '24' ? '_24' : '_general'
     return {
       ...s,
-      recaudado: is107 ? s.rec_107 : s.rec_24,
-      pagadores: is107 ? s.pag_107 : s.pag_24,
-      ticket:    is107 ? s.ticket_107 : s.ticket_24,
-      gastos:    is107 ? s.gastos_107 : s.gastos_24,
-      balance:   is107 ? s.balance_107 : s.balance_24,
-      g_profes:  is107 ? s.g_profes_107 : s.g_profes_24,
-      g_fijos:   is107 ? s.g_fijos_107 : s.g_fijos_24,
-      g_extras:  is107 ? s.g_extras_107 : s.g_extras_24,
+      recaudado: s['rec' + suf],
+      pagadores: s['pag' + suf],
+      ticket:    s['ticket' + suf],
+      gastos:    s['gastos' + suf],
+      balance:   s['balance' + suf],
+      g_profes:  s['g_profes' + suf],
+      g_fijos:   s['g_fijos' + suf],
+      g_extras:  s['g_extras' + suf],
     }
   })
 
@@ -296,7 +296,7 @@ export default function ReportesPage() {
             ))}
           </div>
           <div className="flex gap-1 bg-dark-surface rounded-xl p-1 border border-dark-border">
-            {[['', 'Ambas'], ['107', '107'], ['24', '24']].map(([v, l]) => (
+            {[['', 'Todas'], ['107', '107'], ['24', '24'], ['general', 'Gral']].map(([v, l]) => (
               <button key={v} onClick={() => setSede(v)}
                 className={clsx('px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
                   sede === v ? 'bg-indigo-700 text-white' : 'text-dark-muted hover:text-dark-text'
@@ -507,7 +507,7 @@ export default function ReportesPage() {
       {/* Tabla: Ingresos / Egresos / Saldo por mes */}
       <Card
         title="Ingresos, egresos y saldo por mes"
-        sub={sede ? `Athlon ${sede}` : 'Ambas sedes'}
+        sub={sede === 'general' ? 'Gastos generales' : sede ? `Athlon ${sede}` : 'Todas las sedes'}
         className="mb-4"
       >
         {isLoading ? <Sk className="h-56" /> : (

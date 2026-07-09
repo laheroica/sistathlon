@@ -121,16 +121,16 @@ export default function DashboardPage() {
   const maxRecaudacion = Math.max(...graficoData.map(m => m.total))
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto flex flex-col gap-6">
 
       {/* Header */}
-      <div>
+      <div className="order-1">
         <h1 className="text-2xl font-bold text-dark-text">Dashboard</h1>
         <p className="text-sm text-dark-muted mt-0.5">{mesActualLabel}</p>
       </div>
 
       {/* ── Fila 1: KPIs principales ─────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="order-2 grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard
           icon={DollarSign}
           label="Recaudado este mes"
@@ -182,7 +182,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Fila 2: Gráfico + Estado ─────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="order-4 lg:order-3 grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Gráfico de barras — últimos 6 meses */}
         <div className="card lg:col-span-2">
@@ -247,7 +247,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Fila 3: Disciplinas del mes + Pagos de hoy ───────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="order-3 lg:order-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Recaudación por disciplina este mes */}
         <div className="card">
@@ -331,7 +331,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Acceso rápido ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="order-5 grid grid-cols-3 gap-3">
         {[
           { to: '/alumnos', label: 'Ver impagos', sub: `${alumnos.mora} alumnos`, color: 'text-yellow-400' },
           { to: '/alumnos', label: 'Ver alejados', sub: `${alumnos.alejado} alumnos`, color: 'text-red-400' },

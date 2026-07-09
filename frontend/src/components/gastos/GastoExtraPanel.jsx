@@ -7,6 +7,7 @@ import { money } from '../../lib/format'
 const SEDES = [
   { val: '107', label: 'Athlon 107' },
   { val: '24',  label: 'Athlon 24' },
+  { val: 'general', label: 'General' },
 ]
 
 function hoy() { return new Date().toISOString().slice(0, 10) }
