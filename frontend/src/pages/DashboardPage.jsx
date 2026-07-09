@@ -30,7 +30,7 @@ function CustomTooltip({ active, payload, label }) {
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 // Layout apilado: ícono + etiqueta arriba, y el número abajo usando todo el
 // ancho de la tarjeta (así los montos grandes no se cortan en el celular).
-function KpiCard({ icon: Icon, label, value, sub, color = 'text-dark-text', iconBg = 'bg-dark-border', to }) {
+function KpiCard({ icon: Icon, label, value, sub, color = 'text-dark-text', iconBg = 'bg-dark-border', to, className }) {
   const content = (
     <div className={clsx(
       'card transition-all',
@@ -47,7 +47,9 @@ function KpiCard({ icon: Icon, label, value, sub, color = 'text-dark-text', icon
       {sub && <div className="text-xs text-dark-muted mt-1">{sub}</div>}
     </div>
   )
-  return to ? <Link to={to}>{content}</Link> : content
+  return to
+    ? <Link to={to} className={className}>{content}</Link>
+    : <div className={className}>{content}</div>
 }
 
 // ── Barra de progreso simple ──────────────────────────────────────────────────
@@ -171,6 +173,7 @@ export default function DashboardPage() {
           color="text-yellow-400"
           iconBg="bg-yellow-900/40"
           to="/alumnos"
+          className="hidden lg:block"
         />
         <KpiCard
           icon={UserX}
@@ -180,6 +183,7 @@ export default function DashboardPage() {
           color="text-red-400"
           iconBg="bg-red-900/40"
           to="/alumnos"
+          className="hidden lg:block"
         />
       </div>
 
