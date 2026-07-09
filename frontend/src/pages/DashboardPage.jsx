@@ -28,21 +28,23 @@ function CustomTooltip({ active, payload, label }) {
 }
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
+// Layout apilado: ícono + etiqueta arriba, y el número abajo usando todo el
+// ancho de la tarjeta (así los montos grandes no se cortan en el celular).
 function KpiCard({ icon: Icon, label, value, sub, color = 'text-dark-text', iconBg = 'bg-dark-border', to }) {
   const content = (
     <div className={clsx(
-      'card flex items-center gap-4 transition-all',
+      'card transition-all',
       to && 'hover:border-primary-dark/40 cursor-pointer'
     )}>
-      <div className={clsx('w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0', iconBg)}>
-        <Icon size={20} className={color} />
+      <div className="flex items-center gap-2.5 mb-2">
+        <div className={clsx('w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0', iconBg)}>
+          <Icon size={17} className={color} />
+        </div>
+        <p className="text-[11px] sm:text-xs text-dark-muted uppercase tracking-wide font-medium leading-tight flex-1 min-w-0">{label}</p>
+        {to && <ArrowRight size={13} className="text-dark-border flex-shrink-0" />}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-dark-muted uppercase tracking-wider font-medium">{label}</p>
-        <p className={clsx('text-2xl font-bold leading-tight mt-0.5', color)}>{value}</p>
-        {sub && <p className="text-xs text-dark-muted mt-0.5">{sub}</p>}
-      </div>
-      {to && <ArrowRight size={14} className="text-dark-border flex-shrink-0" />}
+      <p className={clsx('text-lg sm:text-2xl font-bold leading-tight break-words', color)}>{value}</p>
+      {sub && <div className="text-xs text-dark-muted mt-1">{sub}</div>}
     </div>
   )
   return to ? <Link to={to}>{content}</Link> : content
