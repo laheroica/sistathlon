@@ -20,6 +20,10 @@ def dashboard(request):
     rec_ant     = Pago.objects.filter(mes=mes_ant).aggregate(t=Sum('monto'))['t'] or 0
     pagos_hoy   = Pago.objects.filter(fecha_pago=hoy).count()
 
+    # Alumnos distintos que pagaron la cuota del mes corriente
+    pagaron_mes = Pago.objects.filter(mes=mes_actual).values('alumno').distinct().count()
+    ticket_promedio = round(float(rec_actual) / pagaron_mes, 2) if pagaron_mes else 0
+
     estados = dict(
         Alumno.objects.filter(activo=True)
         .values_list('estado')
@@ -73,6 +77,8 @@ def dashboard(request):
             'mes_anterior': float(rec_ant),
             'variacion_pct': round((float(rec_actual) - float(rec_ant)) / float(rec_ant) * 100, 1) if rec_ant else 0,
             'pagos_hoy':   pagos_hoy,
+            'pagaron_mes': pagaron_mes,
+            'ticket_promedio': ticket_promedio,
         },
         'alumnos': {
             'total':    sum(estados.values()),

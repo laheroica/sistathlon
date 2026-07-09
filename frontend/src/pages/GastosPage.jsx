@@ -135,7 +135,10 @@ export default function GastosPage() {
   const totalProfesFiltrado = sede ? (sede === '107' ? profes107 : profes24) : totalProfes
   const profesConHoras = useMemo(
     () => todosProfes
-      .filter(p => (p.clases ?? []).some(c => c.fecha <= HOY && (!sede || c.sede === sede)))
+      .filter(p =>
+        (p.clases ?? []).some(c => c.fecha <= HOY && (!sede || c.sede === sede)) ||
+        montoAcumulado(p, sede) > 0   // fijos/mixtos sin clases (ej. sueldo del dueño)
+      )
       .sort((a, b) => a.profe_nombre.localeCompare(b.profe_nombre)),
     [todosProfes, sede]
   )

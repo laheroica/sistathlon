@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 import {
   TrendingUp, TrendingDown, Users, AlertCircle,
-  CheckCircle, UserX, DollarSign, ArrowRight
+  CheckCircle, UserX, DollarSign, ArrowRight, Receipt
 } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/api'
@@ -106,8 +106,9 @@ export default function DashboardPage() {
     return d.toLocaleString('es-AR', { month: 'long' }).replace(/^\w/, c => c.toUpperCase())
   })()
 
-  // Porcentaje pagaron este mes respecto al total
-  const pctPagaron = alumnos.total > 0 ? ((alumnos.activo / alumnos.total) * 100).toFixed(1) : 0
+  // Alumnos que pagaron la cuota del mes corriente (dato del backend)
+  const pagaronMes = recaudacion.pagaron_mes ?? 0
+  const pctPagaron = alumnos.total > 0 ? ((pagaronMes / alumnos.total) * 100).toFixed(1) : 0
   const subioBajo  = recaudacion.variacion_pct >= 0
 
   // Traducir meses del gráfico a español
@@ -129,7 +130,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Fila 1: KPIs principales ─────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard
           icon={DollarSign}
           label="Recaudado este mes"
@@ -146,11 +147,19 @@ export default function DashboardPage() {
         <KpiCard
           icon={CheckCircle}
           label="Pagaron este mes"
-          value={alumnos.activo}
+          value={pagaronMes}
           sub={`${pctPagaron}% del padrón`}
           color="text-green-400"
           iconBg="bg-green-900/40"
           to="/alumnos"
+        />
+        <KpiCard
+          icon={Receipt}
+          label="Ticket promedio"
+          value={money(recaudacion.ticket_promedio ?? 0)}
+          sub={`sobre ${pagaronMes} cuotas`}
+          color="text-blue-400"
+          iconBg="bg-blue-900/40"
         />
         <KpiCard
           icon={AlertCircle}

@@ -80,7 +80,8 @@ export default function LiquidacionesPage() {
   const profes = useMemo(() => {
     if (!sede) return todosLos
     return todosLos.filter(p =>
-      (p.clases ?? []).some(c => c.sede === sede && c.fecha <= HOY)
+      (p.clases ?? []).some(c => c.sede === sede && c.fecha <= HOY) ||
+      montoAcumulado(p, sede) > 0   // fijos/mixtos sin clases (ej. sueldo del dueño)
     )
   }, [todosLos, sede])
 
@@ -100,7 +101,7 @@ export default function LiquidacionesPage() {
 
   function exportarPDF() {
     const label = `${MESES_ES[month - 1]} ${year}`
-    abrirPDFLiquidaciones(todosLos.filter(p => p.clases_dadas > 0), label, discLabelMap)
+    abrirPDFLiquidaciones(todosLos.filter(p => p.clases_dadas > 0 || p.monto_calculado > 0), label, discLabelMap)
   }
 
   // ── Vista historial ───────────────────────────────────────────────────────

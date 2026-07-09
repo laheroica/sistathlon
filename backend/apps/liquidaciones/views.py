@@ -122,6 +122,21 @@ def calcular_clases_mes(year, month):
     return por_profe
 
 
+def agregar_profes_sin_clases(por_profe):
+    """
+    Suma al dict los profes activos que no aparecen en la grilla pero cobran
+    monto fijo/porcentaje (ej. sueldo del dueño): sin clases, igual se liquidan.
+    """
+    extras = (
+        Profe.objects.filter(activo=True)
+        .exclude(id__in=por_profe.keys())
+        .exclude(tipo_liquidacion='hora')
+    )
+    for p in extras:
+        por_profe[p.id] = {'profe': p, 'clases': []}
+    return por_profe
+
+
 def armar_resultado_profe(profe, clases, year, month, liq=None):
     """Aplica tarifa y devuelve el dict con todos los datos del profe."""
     # Si el profe tiene disciplinas_liquidables configuradas, solo esas cuentan
@@ -199,7 +214,7 @@ def preview_liquidacion(request):
     except Exception:
         return Response({'error': 'Parámetro mes inválido. Usar YYYY-MM.'}, status=400)
 
-    por_profe = calcular_clases_mes(year, month)
+    por_profe = agregar_profes_sin_clases(calcular_clases_mes(year, month))
 
     # Liquidaciones ya guardadas para este mes
     liqqs = {liq.profe_id: liq for liq in Liquidacion.objects.filter(mes=mes_date).select_related('profe')}
@@ -329,7 +344,7 @@ def cerrar_mes(request):
     except Exception:
         return Response({'error': 'mes inválido'}, status=400)
 
-    por_profe = calcular_clases_mes(year, month)
+    por_profe = agregar_profes_sin_clases(calcular_clases_mes(year, month))
     guardadas = []
 
     for pid, data in por_profe.items():
