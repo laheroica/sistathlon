@@ -6,9 +6,11 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ReferenceLine, ResponsiveContainer,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Search } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/api'
+import { useAuth } from '../context/AuthContext'
+import MesDetallePanel from '../components/reportes/MesDetallePanel'
 
 const C = {
   indigo:  '#6366f1',
@@ -216,8 +218,11 @@ function ReportePersonalizado() {
 }
 
 export default function ReportesPage() {
+  const { user } = useAuth()
+  const puedeVerDetalle = user?.rol === 'sadmin'
   const [sede, setSede]   = useState('')
   const [meses, setMeses] = useState(12)
+  const [mesDetalle, setMesDetalle] = useState(null)   // mes_key abierto en el panel
 
   const { data, isLoading } = useQuery({
     queryKey: ['reportes-anual', meses],
@@ -507,7 +512,8 @@ export default function ReportesPage() {
       {/* Tabla: Ingresos / Egresos / Saldo por mes */}
       <Card
         title="Ingresos, egresos y saldo por mes"
-        sub={sede === 'general' ? 'Gastos generales' : sede ? `Athlon ${sede}` : 'Todas las sedes'}
+        sub={(sede === 'general' ? 'Gastos generales' : sede ? `Athlon ${sede}` : 'Todas las sedes')
+          + (puedeVerDetalle ? ' · tocá un mes para ver el detalle' : '')}
         className="mb-4"
       >
         {isLoading ? <Sk className="h-56" /> : (
@@ -519,17 +525,28 @@ export default function ReportesPage() {
                   <th className="text-right font-medium py-2 px-3">Ingresos</th>
                   <th className="text-right font-medium py-2 px-3">Egresos</th>
                   <th className="text-right font-medium py-2 px-3">Saldo</th>
+                  {puedeVerDetalle && <th className="w-8" />}
                 </tr>
               </thead>
               <tbody>
                 {[...seriesFiltradas].reverse().map(s => (
-                  <tr key={s.mes_key} className="border-b border-dark-border/50 hover:bg-dark-bg/40">
+                  <tr
+                    key={s.mes_key}
+                    onClick={puedeVerDetalle ? () => setMesDetalle(s.mes_key) : undefined}
+                    className={clsx(
+                      'border-b border-dark-border/50 hover:bg-dark-bg/40',
+                      puedeVerDetalle && 'cursor-pointer'
+                    )}
+                  >
                     <td className="py-2 px-3 text-dark-text font-medium capitalize">{s.mes}</td>
                     <td className="py-2 px-3 text-right text-green-400">{fmtMoney(s.recaudado)}</td>
                     <td className="py-2 px-3 text-right text-red-400">{fmtMoney(s.gastos)}</td>
                     <td className={clsx('py-2 px-3 text-right font-bold', s.balance >= 0 ? 'text-emerald-400' : 'text-red-400')}>
                       {fmtMoney(s.balance)}
                     </td>
+                    {puedeVerDetalle && (
+                      <td className="py-2 pr-2 text-dark-border"><Search size={13} /></td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -541,6 +558,7 @@ export default function ReportesPage() {
                   <td className={clsx('py-2.5 px-3 text-right', totalSaldo >= 0 ? 'text-emerald-400' : 'text-red-400')}>
                     {fmtMoney(totalSaldo)}
                   </td>
+                  {puedeVerDetalle && <td />}
                 </tr>
               </tfoot>
             </table>
@@ -702,6 +720,10 @@ export default function ReportesPage() {
           </div>
         )}
       </Card>
+
+      {mesDetalle && (
+        <MesDetallePanel mesKey={mesDetalle} onClose={() => setMesDetalle(null)} />
+      )}
     </div>
   )
 }

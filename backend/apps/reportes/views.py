@@ -5,6 +5,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.alumnos.permissions import IsSadmin
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -432,4 +434,108 @@ def anual(request):
             'var_facturacion_pct':  var_facturacion,
             'var_alumnos_pct':      var_alumnos,
         },
+    })
+
+
+# ── Detalle mensual (P&L de un mes: ingresos, egresos al detalle, resultado) ──
+
+@api_view(['GET'])
+@permission_classes([IsSadmin])
+def mes_detalle(request):
+    """
+    Detalle completo de un mes por sede (107 / 24 / general):
+    ingresos, todos los egresos al detalle (profes, gastos fijos, extras) y
+    el resultado. GET /reportes/mes-detalle/?mes=YYYY-MM
+    """
+    from apps.pagos.models import Pago
+    from apps.liquidaciones.models import Liquidacion
+    from apps.caja.models import GastoFijo, GastoExtra, CONCEPTOS_FIJOS
+
+    mes_str = request.GET.get('mes', '')
+    try:
+        year, month = map(int, mes_str.split('-'))
+        mes_date = date(year, month, 1)
+    except Exception:
+        return Response({'error': 'mes inválido. Usar YYYY-MM.'}, status=400)
+
+    def buckets():
+        return {'107': 0.0, '24': 0.0, 'general': 0.0}
+
+    def con_total(b):
+        return {k: round(v) for k, v in b.items()} | {'total': round(sum(b.values()))}
+
+    # ── Ingresos por sede (cuotas cobradas) ──
+    ingresos = buckets()
+    for row in Pago.objects.filter(mes=mes_date).values('alumno__sede').annotate(t=Sum('monto')):
+        if row['alumno__sede'] in ingresos:
+            ingresos[row['alumno__sede']] += float(row['t'] or 0)
+
+    # ── Profes (liquidaciones confirmadas), prorrateado por sede ──
+    profes = []
+    for liq in Liquidacion.objects.filter(mes=mes_date, confirmada=True).select_related('profe'):
+        monto = float(liq.monto_final)
+        clases = liq.detalle or []
+        b = buckets()
+        if clases:
+            n107 = sum(1 for c in clases if c.get('sede') == '107')
+            n24  = sum(1 for c in clases if c.get('sede') == '24')
+            tot = len(clases)
+            b['107'] = monto * n107 / tot
+            b['24']  = monto * n24 / tot
+        else:
+            sp = liq.profe.sede
+            if sp == 'general':
+                b['general'] = monto
+            elif sp in ('107', '24'):
+                b[sp] = monto
+            else:
+                b['107'] = b['24'] = monto / 2
+        profes.append({'nombre': liq.profe.nombre, 'color': liq.profe.color, **con_total(b)})
+    profes.sort(key=lambda x: -x['total'])
+
+    # ── Gastos fijos por concepto y sede ──
+    labels = dict(CONCEPTOS_FIJOS)
+    fijos_map = {}
+    for g in GastoFijo.objects.filter(mes=mes_date):
+        b = fijos_map.setdefault(g.concepto, buckets())
+        if g.sede in b:
+            b[g.sede] += float(g.importe)
+    fijos = [{'concepto': c, 'label': labels.get(c, c), **con_total(b)} for c, b in fijos_map.items()]
+    fijos.sort(key=lambda x: -x['total'])
+
+    # ── Gastos extras (individuales) ──
+    extras = []
+    extras_b = buckets()
+    for g in GastoExtra.objects.filter(mes=mes_date).order_by('sede', 'fecha'):
+        imp = float(g.precio_unitario) * float(g.cantidad)
+        if g.sede in extras_b:
+            extras_b[g.sede] += imp
+        extras.append({'concepto': g.concepto, 'sede': g.sede, 'importe': round(imp)})
+
+    # ── Totales y resultado ──
+    def suma(items):
+        b = buckets()
+        for it in items:
+            for k in b:
+                b[k] += it[k]
+        return b
+
+    tot_profes = suma(profes)
+    tot_fijos  = suma(fijos)
+    egresos = {k: tot_profes[k] + tot_fijos[k] + extras_b[k] for k in buckets()}
+    resultado = {k: ingresos[k] - egresos[k] for k in egresos}
+
+    return Response({
+        'mes': mes_str,
+        'ingresos': con_total(ingresos),
+        'profes': profes,
+        'fijos': fijos,
+        'extras': extras,
+        'totales': {
+            'profes':  con_total(tot_profes),
+            'fijos':   con_total(tot_fijos),
+            'extras':  con_total(extras_b),
+            'egresos': con_total(egresos),
+        },
+        'resultado': con_total(resultado),
     })
