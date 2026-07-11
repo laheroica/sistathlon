@@ -8,6 +8,7 @@ import {
   ShoppingBag, Tag, BookOpen, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react'
 import clsx from 'clsx'
+import logoBlanco from '../assets/logo-blanco.png'
 
 // roles: undefined = todos, array = solo esos roles
 const NAV_ITEMS = [
@@ -60,14 +61,9 @@ export default function Layout() {
         {/* Header + toggle */}
         <div className="p-4 border-b border-dark-border flex items-center justify-between gap-2">
           {!collapsed && (
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-primary-dark flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-sm font-black">A</span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-dark-text leading-none truncate">Sistathlon</p>
-                <p className="text-xs text-dark-muted truncate">Athlon Gym</p>
-              </div>
+            <div className="min-w-0 flex-1">
+              <img src={logoBlanco} alt="Athlon" className="h-7 w-auto object-contain" />
+              <p className="text-[10px] text-dark-muted mt-1 tracking-wide">Sistema de gestión</p>
             </div>
           )}
           <button

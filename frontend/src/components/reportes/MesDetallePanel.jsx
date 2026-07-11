@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, FileDown } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../../lib/api'
 import { money } from '../../lib/format'
+import { abrirInformePDF } from '../../lib/informePDF'
 
 const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -53,7 +54,17 @@ export default function MesDetallePanel({ mesKey, onClose }) {
             <h2 className="text-base font-bold text-dark-text">Detalle — {mesLabel(mesKey)}</h2>
             <p className="text-xs text-dark-muted">Ingresos, egresos y resultado por sede</p>
           </div>
-          <button onClick={onClose} className="text-dark-muted hover:text-dark-text p-1"><X size={18} /></button>
+          <div className="flex items-center gap-1">
+            {data && (
+              <button
+                onClick={() => abrirInformePDF(mesKey, data)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dark-border bg-dark-bg text-dark-muted hover:text-dark-text text-xs font-medium transition-colors"
+              >
+                <FileDown size={13} /> Exportar PDF
+              </button>
+            )}
+            <button onClick={onClose} className="text-dark-muted hover:text-dark-text p-1"><X size={18} /></button>
+          </div>
         </div>
 
         {/* Body */}
@@ -80,7 +91,9 @@ export default function MesDetallePanel({ mesKey, onClose }) {
                 <tr className="bg-dark-bg/50">
                   <td colSpan={5} className="py-1.5 px-2 text-xs font-semibold text-green-400 uppercase tracking-wider">Ingresos</td>
                 </tr>
-                <Fila label="Cuotas cobradas" b={data.ingresos} color="text-green-400" />
+                <Fila label="Cuotas cobradas" b={data.ingresos.cuotas} color="text-green-400" />
+                <Fila label="Productos" b={data.ingresos.productos} color="text-green-400" />
+                <Fila label="Total ingresos" b={data.ingresos.total} bold color="text-green-400" />
 
                 {/* EGRESOS */}
                 <tr className="bg-dark-bg/50">
@@ -138,6 +151,41 @@ export default function MesDetallePanel({ mesKey, onClose }) {
                 </tr>
               </tbody>
             </table>
+          )}
+
+          {/* Alumnos por disciplina + ticket */}
+          {!isLoading && !isError && data && (
+            <div className="mt-6">
+              <p className="text-xs font-semibold text-dark-muted uppercase tracking-wider mb-2">
+                Alumnos por disciplina — {mesLabel(mesKey)}
+              </p>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-dark-muted border-b border-dark-border">
+                    <th className="text-left font-medium py-2 px-2">Disciplina</th>
+                    <th className="text-right font-medium py-2 px-2">Cantidad</th>
+                    <th className="text-right font-medium py-2 px-2">Total cuotas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.disciplinas || []).map(x => (
+                    <tr key={x.codigo} className="border-b border-dark-border/40">
+                      <td className="py-1.5 px-2 text-dark-text">{x.nombre}</td>
+                      <td className="py-1.5 px-2 text-right text-dark-text">{x.cantidad}</td>
+                      <td className="py-1.5 px-2 text-right font-semibold text-dark-text">{money(x.total)}</td>
+                    </tr>
+                  ))}
+                  {(data.disciplinas || []).length === 0 && (
+                    <tr><td colSpan={3} className="py-2 px-2 text-xs text-dark-border">Sin pagos registrados</td></tr>
+                  )}
+                </tbody>
+              </table>
+              <p className="text-xs text-dark-muted mt-3">
+                <span className="font-semibold text-dark-text">Ticket promedio</span> (sin Kids ni Teens):{' '}
+                <span className="font-bold text-blue-400">{money(data.ticket.promedio)}</span>
+                {' '}— sobre {data.ticket.alumnos} alumnos.
+              </p>
+            </div>
           )}
         </div>
       </div>

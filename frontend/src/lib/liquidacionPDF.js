@@ -1,3 +1,5 @@
+import logoNegro from '../assets/logo-negro.jpg'
+
 const DIAS_ES = { lun: 'Lunes', mar: 'Martes', mie: 'Miércoles', jue: 'Jueves', vie: 'Viernes', sab: 'Sábado' }
 
 // Fallback en caso de que el catálogo dinámico de disciplinas no se haya pasado o cargado
@@ -52,8 +54,13 @@ function paginaProfe(p, mesLabel, discLabel) {
     `
   }).join('')
 
+  const logoUrl = `${window.location.origin}${logoNegro}`
+
   return `
     <div class="pagina">
+      <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+        <img src="${logoUrl}" alt="Athlon" style="height:26px;"/>
+      </div>
       <div class="header-profe">
         <div style="display:flex; align-items:center; gap:14px;">
           <div style="width:48px; height:48px; border-radius:50%; background:${p.profe_color || '#6b7280'}; display:flex; align-items:center; justify-content:center; color:white; font-weight:800; font-size:18px; flex-shrink:0;">

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { login } from '../lib/auth'
+import logoBlanco from '../assets/logo-blanco.png'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -31,11 +32,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-dark mb-4">
-            <span className="text-white text-2xl font-black">A</span>
-          </div>
-          <h1 className="text-2xl font-bold text-dark-text">Sistathlon</h1>
-          <p className="text-dark-muted text-sm mt-1">Sistema de Gestión Athlon Gym</p>
+          <img src={logoBlanco} alt="Athlon" className="h-12 w-auto object-contain mx-auto mb-4" />
+          <p className="text-dark-muted text-sm mt-1">Sistema de Gestión</p>
         </div>
 
         <form onSubmit={handleSubmit} className="card space-y-4">

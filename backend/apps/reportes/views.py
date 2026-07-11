@@ -464,11 +464,47 @@ def mes_detalle(request):
     def con_total(b):
         return {k: round(v) for k, v in b.items()} | {'total': round(sum(b.values()))}
 
-    # ── Ingresos por sede (cuotas cobradas) ──
-    ingresos = buckets()
+    # ── Ingresos: cuotas por sede ──
+    cuotas = buckets()
     for row in Pago.objects.filter(mes=mes_date).values('alumno__sede').annotate(t=Sum('monto')):
-        if row['alumno__sede'] in ingresos:
-            ingresos[row['alumno__sede']] += float(row['t'] or 0)
+        if row['alumno__sede'] in cuotas:
+            cuotas[row['alumno__sede']] += float(row['t'] or 0)
+
+    # ── Ingresos: productos por sede (ventas del mes) ──
+    from apps.productos.models import Venta
+    productos = buckets()
+    for row in (Venta.objects.filter(fecha__year=year, fecha__month=month)
+                .values('sede').annotate(t=Sum('total'))):
+        if row['sede'] in productos:
+            productos[row['sede']] += float(row['t'] or 0)
+
+    ingresos_total = {k: cuotas[k] + productos[k] for k in buckets()}
+
+    # ── Alumnos por disciplina que pagaron el mes (cantidad + total cuotas) ──
+    from apps.alumnos.models import DiscipConfig
+    nombres_disc = dict(DiscipConfig.objects.values_list('codigo', 'nombre'))
+    disciplinas = []
+    for row in (Pago.objects.filter(mes=mes_date)
+                .values('alumno__disciplina')
+                .annotate(cant=Count('id'), total=Sum('monto'))
+                .order_by('-total')):
+        cod = row['alumno__disciplina']
+        disciplinas.append({
+            'codigo': cod,
+            'nombre': nombres_disc.get(cod, cod),
+            'cantidad': row['cant'],
+            'total': round(float(row['total'] or 0)),
+        })
+
+    # ── Ticket promedio (excluye Kids y Teens) ──
+    qs_ticket = Pago.objects.filter(mes=mes_date).exclude(alumno__disciplina__in=['KD', 'TN'])
+    n_ticket = qs_ticket.count()
+    sum_ticket = float(qs_ticket.aggregate(t=Sum('monto'))['t'] or 0)
+    ticket = {
+        'promedio': round(sum_ticket / n_ticket) if n_ticket else 0,
+        'alumnos': n_ticket,
+        'base': round(sum_ticket),
+    }
 
     # ── Profes (liquidaciones confirmadas), prorrateado por sede ──
     profes = []
@@ -523,11 +559,17 @@ def mes_detalle(request):
     tot_profes = suma(profes)
     tot_fijos  = suma(fijos)
     egresos = {k: tot_profes[k] + tot_fijos[k] + extras_b[k] for k in buckets()}
-    resultado = {k: ingresos[k] - egresos[k] for k in egresos}
+    resultado = {k: ingresos_total[k] - egresos[k] for k in egresos}
 
     return Response({
         'mes': mes_str,
-        'ingresos': con_total(ingresos),
+        'ingresos': {
+            'cuotas':    con_total(cuotas),
+            'productos': con_total(productos),
+            'total':     con_total(ingresos_total),
+        },
+        'disciplinas': disciplinas,
+        'ticket': ticket,
         'profes': profes,
         'fijos': fijos,
         'extras': extras,
