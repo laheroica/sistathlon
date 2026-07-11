@@ -3,34 +3,63 @@ import logoNegro from '../assets/logo-negro.jpg'
 const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
+// Paleta del informe (celeste = color de marca del logo)
+const CO = {
+  ink:   '#0f172a',
+  body:  '#334155',
+  muted: '#64748b',
+  line:  '#e5e9f0',
+  soft:  '#f7f9fc',
+  brand: '#17a6dd',
+  green: '#15a34a',
+  red:   '#e0413a',
+  amber: '#e08a1e',
+}
+
+// Colores por disciplina para las barras
+const DISC_CO = {
+  CF: '#4f7bf0', HF: '#15a34a', HX: '#e0a01e', FB: '#f2793a',
+  TN: '#9b6ef0', KD: '#e05aa6', BP: '#17b3a6',
+}
+
 function mesLabel(mesKey) {
   const [y, m] = (mesKey || '').split('-').map(Number)
   return `${MESES_ES[m - 1]} ${y}`
 }
 
-// $ con puntos de miles (formato argentino). Vacío ('—') cuando es 0.
+// $ con puntos de miles. dash=true muestra '—' cuando es 0.
 function money(n, dash = true) {
   const v = Math.round(Number(n) || 0)
-  if (v === 0 && dash) return '—'
+  if (v === 0 && dash) return '<span style="color:#cbd5e1">—</span>'
   const s = Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
   return (v < 0 ? '-$' : '$') + s
 }
 
-// Fila de 4 columnas (107 / 24 / general / total)
-function fila4(label, b, { bold = false, indent = false, color = '#111827', trClass = '' } = {}) {
-  const st = bold ? 'font-weight:700;' : ''
+// Fila de la tabla ingresos/egresos (4 columnas de sede)
+function fila4(label, b, { bold = false, indent = false, color = CO.ink, muted = false, trClass = '' } = {}) {
+  const w = bold ? '700' : '400'
+  const lblColor = muted ? CO.muted : CO.ink
   return `
     <tr class="${trClass}">
-      <td style="padding:3px 8px; ${indent ? 'padding-left:22px;' : ''} ${st}">${label}</td>
-      <td style="padding:3px 8px; text-align:right; color:${color}; ${st}">${money(b['107'])}</td>
-      <td style="padding:3px 8px; text-align:right; color:${color}; ${st}">${money(b['24'])}</td>
-      <td style="padding:3px 8px; text-align:right; color:${color}; ${st}">${money(b.general)}</td>
-      <td style="padding:3px 8px; text-align:right; font-weight:700; color:${color};">${money(b.total)}</td>
+      <td style="padding:5px 10px;${indent ? 'padding-left:24px;' : ''}font-weight:${w};color:${lblColor};">${label}</td>
+      <td style="padding:5px 10px;text-align:right;font-weight:${w};color:${color};">${money(b['107'])}</td>
+      <td style="padding:5px 10px;text-align:right;font-weight:${w};color:${color};">${money(b['24'])}</td>
+      <td style="padding:5px 10px;text-align:right;font-weight:${w};color:${color};">${money(b.general)}</td>
+      <td style="padding:5px 10px;text-align:right;font-weight:700;color:${color};">${money(b.total)}</td>
     </tr>`
 }
 
-function seccionHeader(texto, color) {
-  return `<tr><td colspan="5" style="padding:10px 8px 3px; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:${color};">${texto}</td></tr>`
+function grupoLabel(txt) {
+  return `<tr><td colspan="5" style="padding:9px 10px 2px;font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${CO.muted};">${txt}</td></tr>`
+}
+
+function kpiCard(label, valor, { accent, bg, valColor }) {
+  return `
+    <div style="flex:1;background:${bg};border:1px solid ${CO.line};border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;">
+      <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:${accent};"></div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:${CO.muted};margin-bottom:6px;">${label}</div>
+      <div style="font-size:24px;font-weight:800;color:${valColor};line-height:1;">${valor}</div>
+    </div>`
 }
 
 export function abrirInformePDF(mesKey, d) {
@@ -38,91 +67,169 @@ export function abrirInformePDF(mesKey, d) {
   const logoUrl = `${window.location.origin}${logoNegro}`
   const hoy = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
-  const filasDisc = (d.disciplinas || []).map(x => `
-    <tr>
-      <td style="padding:3px 8px;">${x.nombre}</td>
-      <td style="padding:3px 8px; text-align:right;">${x.cantidad}</td>
-      <td style="padding:3px 8px; text-align:right; font-weight:700;">${money(x.total, false)}</td>
-    </tr>`).join('')
+  const res = d.resultado.total
+  const resColor = res >= 0 ? CO.green : CO.red
+
+  // Barras de alumnos por disciplina
+  const discs = d.disciplinas || []
+  const maxTotal = Math.max(1, ...discs.map(x => x.total))
+  const filasDisc = discs.map(x => {
+    const col = DISC_CO[x.codigo] || CO.brand
+    const w = Math.max(4, Math.round(x.total / maxTotal * 100))
+    return `
+      <tr>
+        <td style="padding:6px 10px;white-space:nowrap;color:${CO.ink};font-weight:600;">${x.nombre}</td>
+        <td style="padding:6px 10px;width:52%;">
+          <div style="background:#eef2f7;border-radius:6px;height:14px;overflow:hidden;">
+            <div style="width:${w}%;height:100%;background:${col};border-radius:6px;"></div>
+          </div>
+        </td>
+        <td style="padding:6px 10px;text-align:center;color:${CO.body};font-weight:700;">${x.cantidad}</td>
+        <td style="padding:6px 10px;text-align:right;color:${CO.ink};font-weight:700;">${money(x.total, false)}</td>
+      </tr>`
+  }).join('')
+
+  const thNum = `style="padding:6px 10px;text-align:right;font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:${CO.muted};border-bottom:1.5px solid ${CO.line};"`
 
   const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"/>
 <title>Informe ${label}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: Arial, sans-serif; color:#111827; padding:16mm 14mm; font-size:12px; }
-  .top { display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid #111827; padding-bottom:12px; margin-bottom:16px; }
-  .top img { height:34px; }
-  .top .t { text-align:right; }
-  .top .t h1 { font-size:18px; }
-  .top .t p { font-size:11px; color:#6b7280; margin-top:2px; }
+  body { font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:${CO.body};
+         font-size:12px; padding:14mm 13mm; -webkit-font-smoothing:antialiased; }
+  .hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .hdr img { height:38px; }
+  .hdr .r { text-align:right; }
+  .hdr .r .t { font-size:19px; font-weight:800; color:${CO.ink}; letter-spacing:-.2px; }
+  .hdr .r .m { font-size:13px; font-weight:700; color:${CO.brand}; margin-top:1px; }
+  .hdr .r .d { font-size:10px; color:${CO.muted}; margin-top:2px; }
+  .rule { height:3px; background:linear-gradient(90deg,${CO.brand},${CO.brand}00); border-radius:3px; margin:8px 0 16px; }
+  .kpis { display:flex; gap:12px; margin-bottom:18px; }
+  .card { border:1px solid ${CO.line}; border-radius:14px; overflow:hidden; margin-bottom:16px; }
+  .card > .cap { display:flex; align-items:center; gap:8px; padding:10px 14px; background:${CO.soft};
+                 border-bottom:1px solid ${CO.line}; }
+  .card > .cap .dot { width:9px; height:9px; border-radius:50%; }
+  .card > .cap .tt { font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:${CO.ink}; }
   table { width:100%; border-collapse:collapse; }
-  thead th { font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; padding:4px 8px; border-bottom:1px solid #e5e7eb; }
-  .num { text-align:right; }
-  .bloque { margin-bottom:18px; }
-  .zebra tbody tr:nth-child(even) { background:#f9fafb; }
-  .totalrow td { border-top:2px solid #111827; padding-top:6px; }
-  .resultado td { border-top:2px solid #111827; padding-top:8px; font-size:14px; font-weight:800; }
-  .mini { font-size:11px; color:#374151; margin-top:4px; }
-  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+  .thead th { padding:7px 10px; font-size:9.5px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+              color:${CO.muted}; border-bottom:1.5px solid ${CO.line}; }
+  .tbl tbody tr:nth-child(odd) { background:#fcfdfe; }
+  .totrow td { border-top:2px solid ${CO.ink}; }
+  .resstrip { display:flex; align-items:stretch; border:1px solid ${CO.line}; border-radius:14px; overflow:hidden; margin-bottom:16px; }
+  .resstrip .lab { flex:0 0 auto; background:${CO.ink}; color:#fff; padding:14px 18px; display:flex; flex-direction:column; justify-content:center; }
+  .resstrip .lab .k { font-size:10px; letter-spacing:.8px; text-transform:uppercase; opacity:.8; }
+  .resstrip .lab .v { font-size:22px; font-weight:800; margin-top:2px; }
+  .resstrip .cols { flex:1; display:flex; }
+  .resstrip .cols .c { flex:1; padding:12px 14px; text-align:center; border-left:1px solid ${CO.line}; }
+  .resstrip .cols .c .k { font-size:9.5px; letter-spacing:.5px; text-transform:uppercase; color:${CO.muted}; }
+  .resstrip .cols .c .v { font-size:15px; font-weight:800; margin-top:3px; }
+  .ticket { display:flex; align-items:center; gap:14px; background:${CO.soft}; border:1px solid ${CO.line};
+            border-radius:12px; padding:12px 16px; }
+  .ticket .big { font-size:22px; font-weight:800; color:${CO.brand}; }
+  .foot { margin-top:14px; text-align:center; font-size:9.5px; color:${CO.muted}; }
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } .card,.resstrip{ break-inside:avoid; } }
 </style></head>
 <body>
-  <div class="top">
+  <div class="hdr">
     <img src="${logoUrl}" alt="Athlon"/>
-    <div class="t"><h1>Informe mensual — ${label}</h1><p>Ingresos, egresos y resultado por sede · generado ${hoy}</p></div>
+    <div class="r">
+      <div class="t">Informe mensual</div>
+      <div class="m">${label}</div>
+      <div class="d">Generado ${hoy}</div>
+    </div>
+  </div>
+  <div class="rule"></div>
+
+  <!-- KPIs -->
+  <div class="kpis">
+    ${kpiCard('Ingresos totales', money(d.ingresos.total.total, false), { accent: CO.green, bg:'#f2fbf5', valColor: CO.green })}
+    ${kpiCard('Egresos totales', money(d.totales.egresos.total, false), { accent: CO.red, bg:'#fef4f3', valColor: CO.red })}
+    ${kpiCard('Resultado del mes', money(res, false), { accent: resColor, bg:'#f4f9fc', valColor: resColor })}
   </div>
 
-  <!-- INGRESOS + EGRESOS + RESULTADO -->
-  <table class="bloque">
-    <thead><tr>
-      <th style="text-align:left;">Concepto</th>
-      <th class="num">A107</th><th class="num">A24</th><th class="num">General</th><th class="num">Total</th>
-    </tr></thead>
-    <tbody>
-      ${seccionHeader('Ingresos', '#16a34a')}
-      ${fila4('Cuotas cobradas', d.ingresos.cuotas, { color:'#16a34a' })}
-      ${fila4('Productos', d.ingresos.productos, { color:'#16a34a' })}
-      ${fila4('Total ingresos', d.ingresos.total, { bold:true, color:'#16a34a' })}
+  <!-- INGRESOS -->
+  <div class="card">
+    <div class="cap"><span class="dot" style="background:${CO.green}"></span><span class="tt">Ingresos</span></div>
+    <table class="tbl">
+      <thead class="thead"><tr>
+        <th style="text-align:left;">Concepto</th>
+        <th ${thNum}>A107</th><th ${thNum}>A24</th><th ${thNum}>General</th><th ${thNum}>Total</th>
+      </tr></thead>
+      <tbody>
+        ${fila4('Cuotas cobradas', d.ingresos.cuotas, { color: CO.green })}
+        ${fila4('Productos', d.ingresos.productos, { color: CO.green })}
+        ${fila4('Total ingresos', d.ingresos.total, { bold:true, color: CO.green, trClass:'totrow' })}
+      </tbody>
+    </table>
+  </div>
 
-      ${seccionHeader('Egresos', '#dc2626')}
-      <tr><td colspan="5" style="padding:4px 8px 0; font-size:11px; color:#6b7280;">Profes</td></tr>
-      ${(d.profes||[]).map(p => fila4(p.nombre, p, { indent:true })).join('')}
-      ${fila4('Subtotal profes', d.totales.profes, { bold:true })}
+  <!-- EGRESOS -->
+  <div class="card">
+    <div class="cap"><span class="dot" style="background:${CO.red}"></span><span class="tt">Egresos</span></div>
+    <table class="tbl">
+      <thead class="thead"><tr>
+        <th style="text-align:left;">Concepto</th>
+        <th ${thNum}>A107</th><th ${thNum}>A24</th><th ${thNum}>General</th><th ${thNum}>Total</th>
+      </tr></thead>
+      <tbody>
+        ${grupoLabel('Profes')}
+        ${(d.profes||[]).map(p => fila4(p.nombre, p, { indent:true })).join('')}
+        ${(d.profes||[]).length === 0 ? `<tr><td colspan="5" style="padding:4px 24px;color:#cbd5e1;">Sin liquidaciones confirmadas</td></tr>` : ''}
+        ${fila4('Subtotal profes', d.totales.profes, { bold:true, muted:true })}
 
-      <tr><td colspan="5" style="padding:6px 8px 0; font-size:11px; color:#6b7280;">Gastos fijos</td></tr>
-      ${(d.fijos||[]).map(f => fila4(f.label, f, { indent:true })).join('')}
-      ${fila4('Subtotal fijos', d.totales.fijos, { bold:true })}
+        ${grupoLabel('Gastos fijos')}
+        ${(d.fijos||[]).map(f => fila4(f.label, f, { indent:true })).join('')}
+        ${(d.fijos||[]).length === 0 ? `<tr><td colspan="5" style="padding:4px 24px;color:#cbd5e1;">Sin gastos fijos</td></tr>` : ''}
+        ${fila4('Subtotal fijos', d.totales.fijos, { bold:true, muted:true })}
 
-      <tr><td colspan="5" style="padding:6px 8px 0; font-size:11px; color:#6b7280;">Gastos extras</td></tr>
-      ${(d.extras||[]).map(e => {
-        const b = { '107':0, '24':0, general:0, total:e.importe }; b[e.sede] = e.importe
-        return fila4(e.concepto, b, { indent:true })
-      }).join('')}
-      ${fila4('Subtotal extras', d.totales.extras, { bold:true })}
+        ${grupoLabel('Gastos extras')}
+        ${(d.extras||[]).map(e => {
+          const b = { '107':0, '24':0, general:0, total:e.importe }; b[e.sede] = e.importe
+          return fila4(e.concepto, b, { indent:true })
+        }).join('')}
+        ${(d.extras||[]).length === 0 ? `<tr><td colspan="5" style="padding:4px 24px;color:#cbd5e1;">Sin gastos extras</td></tr>` : ''}
+        ${fila4('Subtotal extras', d.totales.extras, { bold:true, muted:true })}
 
-      ${fila4('Total egresos', d.totales.egresos, { bold:true, color:'#dc2626', trClass:'totalrow' })}
+        ${fila4('Total egresos', d.totales.egresos, { bold:true, color: CO.red, trClass:'totrow' })}
+      </tbody>
+    </table>
+  </div>
 
-      <tr class="resultado">
-        <td style="padding-top:8px;">RESULTADO DEL MES</td>
-        <td class="num" style="padding-top:8px; color:${d.resultado['107']>=0?'#16a34a':'#dc2626'};">${money(d.resultado['107'], false)}</td>
-        <td class="num" style="padding-top:8px; color:${d.resultado['24']>=0?'#16a34a':'#dc2626'};">${money(d.resultado['24'], false)}</td>
-        <td class="num" style="padding-top:8px; color:${d.resultado.general>=0?'#16a34a':'#dc2626'};">${money(d.resultado.general, false)}</td>
-        <td class="num" style="padding-top:8px; color:${d.resultado.total>=0?'#16a34a':'#dc2626'};">${money(d.resultado.total, false)}</td>
-      </tr>
-    </tbody>
-  </table>
+  <!-- RESULTADO por sede -->
+  <div class="resstrip">
+    <div class="lab"><span class="k">Resultado del mes</span><span class="v">${money(res, false)}</span></div>
+    <div class="cols">
+      ${['107','24','general'].map(k => `
+        <div class="c"><div class="k">${k==='general'?'General':'Athlon '+k}</div>
+          <div class="v" style="color:${d.resultado[k]>=0?CO.green:CO.red}">${money(d.resultado[k], false)}</div></div>`).join('')}
+    </div>
+  </div>
 
   <!-- ALUMNOS POR DISCIPLINA -->
-  <div class="bloque">
-    <table class="zebra">
-      <thead><tr>
-        <th style="text-align:left;">Alumnos por disciplina (${label})</th>
-        <th class="num">Cantidad</th><th class="num">Total cuotas</th>
+  <div class="card">
+    <div class="cap"><span class="dot" style="background:${CO.brand}"></span><span class="tt">Alumnos por disciplina — ${label}</span></div>
+    <table>
+      <thead class="thead"><tr>
+        <th style="text-align:left;">Disciplina</th>
+        <th style="text-align:left;"></th>
+        <th style="text-align:center;">Alumnos</th>
+        <th style="text-align:right;">Total cuotas</th>
       </tr></thead>
-      <tbody>${filasDisc || '<tr><td colspan="3" style="padding:6px 8px; color:#9ca3af;">Sin pagos registrados</td></tr>'}</tbody>
+      <tbody>${filasDisc || `<tr><td colspan="4" style="padding:8px 10px;color:#cbd5e1;">Sin pagos registrados</td></tr>`}</tbody>
     </table>
-    <p class="mini"><b>Ticket promedio</b> (sin Kids ni Teens): <b>${money(d.ticket.promedio, false)}</b> — calculado sobre ${d.ticket.alumnos} alumnos.</p>
   </div>
+
+  <!-- TICKET -->
+  <div class="ticket">
+    <div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${CO.muted};">Ticket promedio</div>
+      <div style="font-size:11px;color:${CO.muted};margin-top:2px;">Sin Kids ni Teens · sobre ${d.ticket.alumnos} alumnos</div>
+    </div>
+    <div class="big" style="margin-left:auto;">${money(d.ticket.promedio, false)}</div>
+  </div>
+
+  <div class="foot">Athlon · Informe de ${label} · General Pico, La Pampa</div>
 
   <script>window.onload = () => window.print()<\/script>
 </body></html>`
