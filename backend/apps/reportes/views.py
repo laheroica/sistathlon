@@ -471,7 +471,7 @@ def mes_detalle(request):
             cuotas[row['alumno__sede']] += float(row['t'] or 0)
 
     # ── Ingresos: productos por sede (ventas del mes) ──
-    from apps.productos.models import Venta
+    from apps.productos.models import Venta, VentaItem
     productos = buckets()
     for row in (Venta.objects.filter(fecha__year=year, fecha__month=month)
                 .values('sede').annotate(t=Sum('total'))):
@@ -479,6 +479,32 @@ def mes_detalle(request):
             productos[row['sede']] += float(row['t'] or 0)
 
     ingresos_total = {k: cuotas[k] + productos[k] for k in buckets()}
+
+    # ── Detalle de ventas de productos (una fila por item) ──
+    ventas = []
+    for it in (VentaItem.objects
+               .filter(venta__fecha__year=year, venta__fecha__month=month)
+               .select_related('venta', 'venta__alumno', 'producto')):
+        v = it.venta
+        cliente = v.alumno.nombre_completo if v.alumno else (v.comprador_nombre or 'Externo')
+        ventas.append({
+            'sede': v.sede,
+            'fecha': v.fecha.strftime('%d/%m/%Y'),
+            'fecha_iso': v.fecha.isoformat(),
+            'cliente': cliente,
+            'producto': it.producto.nombre,
+            'cantidad': it.cantidad,
+            'valor': round(float(it.precio_unitario) * it.cantidad),
+            'estado': 'pendiente' if v.metodo_pago == 'cuenta_corriente' else 'pago',
+        })
+    # Orden: Sucursal, Fecha, Cliente, Producto
+    ventas.sort(key=lambda x: (x['sede'], x['fecha_iso'], x['cliente'].lower(), x['producto'].lower()))
+    ventas_resumen = {
+        'items': len(ventas),
+        'unidades': sum(v['cantidad'] for v in ventas),
+        'total': sum(v['valor'] for v in ventas),
+        'pendiente': sum(v['valor'] for v in ventas if v['estado'] == 'pendiente'),
+    }
 
     # ── Alumnos por disciplina que pagaron el mes (cantidad + total cuotas) ──
     from apps.alumnos.models import DiscipConfig
@@ -570,6 +596,8 @@ def mes_detalle(request):
         },
         'disciplinas': disciplinas,
         'ticket': ticket,
+        'ventas': ventas,
+        'ventas_resumen': ventas_resumen,
         'profes': profes,
         'fijos': fijos,
         'extras': extras,

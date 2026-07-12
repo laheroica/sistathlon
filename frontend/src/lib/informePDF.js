@@ -53,6 +53,66 @@ function grupoLabel(txt) {
   return `<tr><td colspan="5" style="padding:9px 10px 2px;font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${CO.muted};">${txt}</td></tr>`
 }
 
+const SEDE_LABEL = { '107': 'Athlon 107', '24': 'Athlon 24', general: 'General' }
+
+// Segunda página: detalle de ventas de productos
+function paginaVentas(d, label, logoUrl, hoy) {
+  const ventas = d.ventas || []
+  if (ventas.length === 0) return ''
+  const r = d.ventas_resumen || {}
+
+  const filas = ventas.map((v, i) => {
+    const estadoChip = v.estado === 'pendiente'
+      ? `<span style="display:inline-block;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:700;color:${CO.amber};background:#fdf3e3;border:1px solid #f6dfb8;">Pendiente</span>`
+      : `<span style="display:inline-block;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:700;color:${CO.green};background:#eafaf0;border:1px solid #c7ecd5;">Pagado</span>`
+    return `
+      <tr style="${i % 2 ? 'background:#fcfdfe;' : ''}">
+        <td style="padding:6px 10px;color:${CO.body};">${SEDE_LABEL[v.sede] || v.sede}</td>
+        <td style="padding:6px 10px;color:${CO.body};white-space:nowrap;">${v.fecha}</td>
+        <td style="padding:6px 10px;color:${CO.ink};font-weight:600;">${v.cliente}</td>
+        <td style="padding:6px 10px;color:${CO.body};">${v.producto}${v.cantidad > 1 ? ` <span style="color:${CO.muted};">×${v.cantidad}</span>` : ''}</td>
+        <td style="padding:6px 10px;text-align:right;color:${CO.ink};font-weight:700;">${money(v.valor, false)}</td>
+        <td style="padding:6px 10px;text-align:center;">${estadoChip}</td>
+      </tr>`
+  }).join('')
+
+  const th = `style="padding:7px 10px;text-align:left;font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:${CO.muted};border-bottom:1.5px solid ${CO.line};"`
+  const thR = th.replace('text-align:left', 'text-align:right')
+  const thC = th.replace('text-align:left', 'text-align:center')
+
+  return `
+  <div class="page2">
+    <div class="hdr">
+      <img src="${logoUrl}" alt="Athlon"/>
+      <div class="r">
+        <div class="t">Ventas de productos</div>
+        <div class="m">${label}</div>
+        <div class="d">Generado ${hoy}</div>
+      </div>
+    </div>
+    <div class="rule"></div>
+
+    <div class="kpis">
+      ${kpiCard('Productos vendidos', String(r.unidades || 0), { accent: CO.brand, bg:'#f4f9fc', valColor: CO.ink })}
+      ${kpiCard('Total vendido', money(r.total, false), { accent: CO.green, bg:'#f2fbf5', valColor: CO.green })}
+      ${kpiCard('Pendiente de cobro', money(r.pendiente, false), { accent: CO.amber, bg:'#fdf7ec', valColor: CO.amber })}
+    </div>
+
+    <div class="card">
+      <div class="cap"><span class="dot" style="background:${CO.brand}"></span><span class="tt">Detalle de ventas — ${label}</span></div>
+      <table>
+        <thead><tr>
+          <th ${th}>Sucursal</th><th ${th}>Fecha</th><th ${th}>Cliente</th>
+          <th ${th}>Producto</th><th ${thR}>Valor</th><th ${thC}>Estado</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
+
+    <div class="foot">Athlon · Ventas de ${label} · ${r.items} venta(s) · General Pico, La Pampa</div>
+  </div>`
+}
+
 function kpiCard(label, valor, { accent, bg, valColor }) {
   return `
     <div style="flex:1;background:${bg};border:1px solid ${CO.line};border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;">
@@ -128,6 +188,7 @@ export function abrirInformePDF(mesKey, d) {
             border-radius:12px; padding:12px 16px; }
   .ticket .big { font-size:22px; font-weight:800; color:${CO.brand}; }
   .foot { margin-top:14px; text-align:center; font-size:9.5px; color:${CO.muted}; }
+  .page2 { break-before:page; page-break-before:always; padding-top:2mm; }
   @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } .card,.resstrip{ break-inside:avoid; } }
 </style></head>
 <body>
@@ -230,6 +291,8 @@ export function abrirInformePDF(mesKey, d) {
   </div>
 
   <div class="foot">Athlon · Informe de ${label} · General Pico, La Pampa</div>
+
+  ${paginaVentas(d, label, logoUrl, hoy)}
 
   <script>window.onload = () => window.print()<\/script>
 </body></html>`
