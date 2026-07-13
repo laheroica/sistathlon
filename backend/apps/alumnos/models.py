@@ -149,3 +149,33 @@ class DiscipConfig(models.Model):
 
     def __str__(self):
         return f"{self.codigo} — {self.nombre}"
+
+
+# ── Configuración del negocio (singleton, despersonalizable) ────────────────────
+
+class NegocioConfig(models.Model):
+    """
+    Configuración global del negocio. Es un singleton (siempre pk=1) para poder
+    despersonalizar el sistema: nombre, ciudad y logos configurables sin tocar código.
+    Los logos se guardan como data URI base64 (persisten sin depender del filesystem).
+    """
+    nombre      = models.CharField(max_length=100, default='Athlon')
+    ciudad      = models.CharField(max_length=120, blank=True, default='General Pico, La Pampa')
+    logo_claro  = models.TextField(blank=True, help_text='Logo para fondo oscuro (sistema). Data URI base64.')
+    logo_oscuro = models.TextField(blank=True, help_text='Logo para fondo claro (PDFs). Data URI base64.')
+
+    class Meta:
+        verbose_name        = 'Configuración del negocio'
+        verbose_name_plural = 'Configuración del negocio'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return f"Config: {self.nombre}"

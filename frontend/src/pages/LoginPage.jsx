@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { login } from '../lib/auth'
-import logoBlanco from '../assets/logo-blanco.png'
+import { useNegocio } from '../hooks/useNegocio'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const { setUser } = useAuth()
   const navigate = useNavigate()
+  const { logoClaro, ciudad } = useNegocio()
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -32,7 +33,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src={logoBlanco} alt="Athlon" className="h-12 w-auto object-contain mx-auto mb-4" />
+          <img src={logoClaro} alt="Logo" className="h-12 w-auto object-contain mx-auto mb-4" />
           <p className="text-dark-muted text-sm mt-1">Sistema de Gestión</p>
         </div>
 
@@ -79,9 +80,9 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-xs text-dark-muted mt-6">
-          General Pico, La Pampa · Athlon 107 &amp; Athlon 24
-        </p>
+        {ciudad && (
+          <p className="text-center text-xs text-dark-muted mt-6">{ciudad}</p>
+        )}
       </div>
     </div>
   )

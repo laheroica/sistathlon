@@ -5,10 +5,10 @@ import { logout } from '../lib/auth'
 import {
   LayoutDashboard, Users, UserPlus, Calendar, DollarSign,
   MessageSquare, Archive, BarChart2, Clock, LogOut, Receipt, CreditCard,
-  ShoppingBag, Tag, BookOpen, PanelLeftClose, PanelLeftOpen
+  ShoppingBag, Tag, BookOpen, PanelLeftClose, PanelLeftOpen, Settings
 } from 'lucide-react'
 import clsx from 'clsx'
-import logoBlanco from '../assets/logo-blanco.png'
+import { useNegocio } from '../hooks/useNegocio'
 
 // roles: undefined = todos, array = solo esos roles
 const NAV_ITEMS = [
@@ -26,11 +26,17 @@ const NAV_ITEMS = [
   { to: '/reportes',      icon: BarChart2,       label: 'Reportes' },
   { to: '/productos',     icon: ShoppingBag,     label: 'Productos' },
   { to: '/temporales',    icon: Clock,           label: 'Temporales' },
+  { to: '/config',        icon: Settings,        label: 'Configuración',  roles: ['sadmin'] },
 ]
 
 export default function Layout() {
   const { user, setUser } = useAuth()
   const navigate = useNavigate()
+  const { logoClaro, nombre } = useNegocio()
+
+  useEffect(() => {
+    if (nombre) document.title = `${nombre} · Sistema de gestión`
+  }, [nombre])
 
   // Barra lateral colapsable (persistida). Arranca colapsada en pantallas chicas.
   const [collapsed, setCollapsed] = useState(() => {
@@ -62,7 +68,7 @@ export default function Layout() {
         <div className="p-4 border-b border-dark-border flex items-center justify-between gap-2">
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <img src={logoBlanco} alt="Athlon" className="h-7 w-auto object-contain" />
+              <img src={logoClaro} alt="Logo" className="h-7 w-auto object-contain" />
               <p className="text-[10px] text-dark-muted mt-1 tracking-wide">Sistema de gestión</p>
             </div>
           )}

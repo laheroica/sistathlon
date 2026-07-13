@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Alumno, DiscipConfig
+from .models import Alumno, DiscipConfig, NegocioConfig
 
 
 # ── Disciplinas ────────────────────────────────────────────────────────────────
@@ -8,6 +8,14 @@ class DiscipConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model  = DiscipConfig
         fields = ['id', 'codigo', 'nombre', 'frecuencias', 'color_badge', 'color_hex', 'orden', 'activo']
+
+
+# ── Configuración del negocio ───────────────────────────────────────────────────
+
+class NegocioConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = NegocioConfig
+        fields = ['nombre', 'ciudad', 'logo_claro', 'logo_oscuro']
 
 
 class AlumnoListSerializer(serializers.ModelSerializer):

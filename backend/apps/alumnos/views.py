@@ -1,14 +1,34 @@
 from django.db.models import Q
 from rest_framework import generics, filters
 from rest_framework.decorators import api_view
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, SAFE_METHODS, BasePermission
 from rest_framework.response import Response
-from .models import Alumno, EstadoAlumno, DiscipConfig
+from .models import Alumno, EstadoAlumno, DiscipConfig, NegocioConfig
 from .serializers import (
     AlumnoListSerializer, AlumnoDetailSerializer,
     AlumnoCreateSerializer, AlumnoPatchSerializer,
-    DiscipConfigSerializer,
+    DiscipConfigSerializer, NegocioConfigSerializer,
 )
+from .auth_views import get_rol
+
+
+class SadminOrReadOnly(BasePermission):
+    """Lectura pública (para mostrar marca en el login); escritura solo sadmin."""
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        return bool(request.user and request.user.is_authenticated
+                    and get_rol(request.user) == 'sadmin')
+
+
+# ── Configuración del negocio (singleton) ──────────────────────────────────────
+
+class NegocioConfigView(generics.RetrieveUpdateAPIView):
+    serializer_class   = NegocioConfigSerializer
+    permission_classes = [SadminOrReadOnly]
+
+    def get_object(self):
+        return NegocioConfig.get()
 
 
 # ── Disciplinas (ABM dinámico) ─────────────────────────────────────────────────

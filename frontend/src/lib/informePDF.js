@@ -1,4 +1,4 @@
-import logoNegro from '../assets/logo-negro.jpg'
+import logoNegroAsset from '../assets/logo-negro.jpg'
 
 const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -56,7 +56,7 @@ function grupoLabel(txt) {
 const SEDE_LABEL = { '107': 'Athlon 107', '24': 'Athlon 24', general: 'General' }
 
 // Segunda página: detalle de ventas de productos
-function paginaVentas(d, label, logoUrl, hoy) {
+function paginaVentas(d, label, logoUrl, hoy, nombre = 'Athlon', ciudad = '') {
   const ventas = d.ventas || []
   if (ventas.length === 0) return ''
   const r = d.ventas_resumen || {}
@@ -109,7 +109,7 @@ function paginaVentas(d, label, logoUrl, hoy) {
       </table>
     </div>
 
-    <div class="foot">Athlon · Ventas de ${label} · ${r.items} venta(s) · General Pico, La Pampa</div>
+    <div class="foot">${nombre} · Ventas de ${label} · ${r.items} venta(s)${ciudad ? ' · ' + ciudad : ''}</div>
   </div>`
 }
 
@@ -122,9 +122,11 @@ function kpiCard(label, valor, { accent, bg, valColor }) {
     </div>`
 }
 
-export function abrirInformePDF(mesKey, d) {
+export function abrirInformePDF(mesKey, d, branding = {}) {
   const label = mesLabel(mesKey)
-  const logoUrl = `${window.location.origin}${logoNegro}`
+  const logoUrl = branding.logoUrl || `${window.location.origin}${logoNegroAsset}`
+  const nombre  = branding.nombre || 'Athlon'
+  const ciudad  = branding.ciudad || ''
   const hoy = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
   const res = d.resultado.total
@@ -290,9 +292,9 @@ export function abrirInformePDF(mesKey, d) {
     <div class="big" style="margin-left:auto;">${money(d.ticket.promedio, false)}</div>
   </div>
 
-  <div class="foot">Athlon · Informe de ${label} · General Pico, La Pampa</div>
+  <div class="foot">${nombre} · Informe de ${label}${ciudad ? ' · ' + ciudad : ''}</div>
 
-  ${paginaVentas(d, label, logoUrl, hoy)}
+  ${paginaVentas(d, label, logoUrl, hoy, nombre, ciudad)}
 
   <script>window.onload = () => window.print()<\/script>
 </body></html>`

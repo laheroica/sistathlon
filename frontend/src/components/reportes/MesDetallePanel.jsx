@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import api from '../../lib/api'
 import { money } from '../../lib/format'
 import { abrirInformePDF } from '../../lib/informePDF'
+import { useNegocio } from '../../hooks/useNegocio'
 
 const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -36,6 +37,7 @@ function Fila({ label, b, bold, indent, color }) {
 }
 
 export default function MesDetallePanel({ mesKey, onClose }) {
+  const { brandingPDF } = useNegocio()
   const { data, isLoading, isError } = useQuery({
     queryKey: ['mes-detalle', mesKey],
     queryFn: () => api.get('/reportes/mes-detalle/', { params: { mes: mesKey } }).then(r => r.data),
@@ -57,7 +59,7 @@ export default function MesDetallePanel({ mesKey, onClose }) {
           <div className="flex items-center gap-1">
             {data && (
               <button
-                onClick={() => abrirInformePDF(mesKey, data)}
+                onClick={() => abrirInformePDF(mesKey, data, brandingPDF)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dark-border bg-dark-bg text-dark-muted hover:text-dark-text text-xs font-medium transition-colors"
               >
                 <FileDown size={13} /> Exportar PDF

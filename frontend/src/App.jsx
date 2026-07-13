@@ -46,6 +46,7 @@ import ProductosPage from './pages/ProductosPage'
 import MensajesPage from './pages/MensajesPage'
 import PreciosPage from './pages/PreciosPage'
 import DisciplinasPage from './pages/DisciplinasPage'
+import ConfigNegocioPage from './pages/ConfigNegocioPage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -79,6 +80,7 @@ function AppRoutes() {
         <Route path="profes" element={<RolRoute roles={['sadmin']}><ProfesPage /></RolRoute>} />
         <Route path="precios" element={<RolRoute roles={['sadmin']}><PreciosPage /></RolRoute>} />
         <Route path="disciplinas" element={<RolRoute roles={['sadmin']}><DisciplinasPage /></RolRoute>} />
+        <Route path="config" element={<RolRoute roles={['sadmin']}><ConfigNegocioPage /></RolRoute>} />
         <Route path="horarios" element={<HorariosPage />} />
         <Route path="liquidaciones" element={<RolRoute roles={['sadmin']}><LiquidacionesPage /></RolRoute>} />
         <Route path="mensajes" element={<MensajesPage />} />

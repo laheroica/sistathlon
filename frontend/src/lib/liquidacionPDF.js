@@ -1,4 +1,4 @@
-import logoNegro from '../assets/logo-negro.jpg'
+import logoNegroAsset from '../assets/logo-negro.jpg'
 
 const DIAS_ES = { lun: 'Lunes', mar: 'Martes', mie: 'Miércoles', jue: 'Jueves', vie: 'Viernes', sab: 'Sábado' }
 
@@ -11,7 +11,7 @@ function estado(p) {
   return               { texto: 'PENDIENTE',   color: '#6b7280' }
 }
 
-function paginaProfe(p, mesLabel, discLabel) {
+function paginaProfe(p, mesLabel, discLabel, logoUrl, nombre) {
   const clases = [...(p.clases ?? [])].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora))
   const porDia = []
   let diaActual = null
@@ -54,12 +54,10 @@ function paginaProfe(p, mesLabel, discLabel) {
     `
   }).join('')
 
-  const logoUrl = `${window.location.origin}${logoNegro}`
-
   return `
     <div class="pagina">
       <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
-        <img src="${logoUrl}" alt="Athlon" style="height:26px;"/>
+        <img src="${logoUrl}" alt="${nombre}" style="height:26px;"/>
       </div>
       <div class="header-profe">
         <div style="display:flex; align-items:center; gap:14px;">
@@ -91,7 +89,7 @@ function paginaProfe(p, mesLabel, discLabel) {
       ${bloquePorcentaje}
 
       <div class="footer-profe">
-        <span>Athlon · ${mesLabel}</span>
+        <span>${nombre} · ${mesLabel}</span>
         <span style="font-weight:700;">Total: $${p.monto_final.toLocaleString('es-AR')}</span>
       </div>
     </div>
@@ -103,8 +101,10 @@ function paginaProfe(p, mesLabel, discLabel) {
  * `discLabelMap` es el catálogo dinámico de disciplinas ({ CF: 'CrossFit', ... }
  * desde `useDisciplinas()`); si falta algún código, se usa el fallback interno.
  */
-export function abrirPDFLiquidaciones(profes, mesLabel, discLabelMap = {}) {
+export function abrirPDFLiquidaciones(profes, mesLabel, discLabelMap = {}, branding = {}) {
   const discLabel = { ...DISC_LABEL_FB, ...discLabelMap }
+  const logoUrl = branding.logoUrl || `${window.location.origin}${logoNegroAsset}`
+  const nombre  = branding.nombre || 'Athlon'
   const titulo = profes.length === 1
     ? `Liquidación ${profes[0].profe_nombre} — ${mesLabel}`
     : `Liquidaciones ${mesLabel}`
@@ -148,7 +148,7 @@ export function abrirPDFLiquidaciones(profes, mesLabel, discLabelMap = {}) {
   </style>
 </head>
 <body>
-  ${profes.map(p => paginaProfe(p, mesLabel, discLabel)).join('')}
+  ${profes.map(p => paginaProfe(p, mesLabel, discLabel, logoUrl, nombre)).join('')}
   <script>window.onload = () => window.print()<\/script>
 </body>
 </html>`

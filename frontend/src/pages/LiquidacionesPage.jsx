@@ -10,6 +10,7 @@ import { money } from '../lib/format'
 import { HOY, montoAcumulado, montoProyectado } from '../lib/liquidaciones'
 import { abrirPDFLiquidaciones } from '../lib/liquidacionPDF'
 import { useDisciplinas } from '../hooks/useDisciplinas'
+import { useNegocio } from '../hooks/useNegocio'
 import LiquidacionPanel from '../components/liquidaciones/LiquidacionPanel'
 import CierreMesPanel   from '../components/liquidaciones/CierreMesPanel'
 
@@ -53,6 +54,7 @@ export default function LiquidacionesPage() {
   const qc  = useQueryClient()
   const mes = mesStr(year, month)
   const { labelMap: discLabelMap } = useDisciplinas()
+  const { brandingPDF } = useNegocio()
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['liquidaciones-preview', mes],
@@ -101,7 +103,7 @@ export default function LiquidacionesPage() {
 
   function exportarPDF() {
     const label = `${MESES_ES[month - 1]} ${year}`
-    abrirPDFLiquidaciones(todosLos.filter(p => p.clases_dadas > 0 || p.monto_calculado > 0), label, discLabelMap)
+    abrirPDFLiquidaciones(todosLos.filter(p => p.clases_dadas > 0 || p.monto_calculado > 0), label, discLabelMap, brandingPDF)
   }
 
   // ── Vista historial ───────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import api from '../../lib/api'
 import { money } from '../../lib/format'
 import { abrirPDFLiquidaciones } from '../../lib/liquidacionPDF'
 import { useDisciplinas } from '../../hooks/useDisciplinas'
+import { useNegocio } from '../../hooks/useNegocio'
 
 // Fallback en caso de que el catálogo dinámico de disciplinas no haya cargado aún
 const DISC_LABEL_FB = { CF: 'CrossFit', HF: 'Heavy Funcional', HX: 'Hyrox', FB: 'FullBody', TN: 'Teens', KD: 'Kids', BP: 'Bonus Pack' }
@@ -14,6 +15,7 @@ const HOY = new Date().toISOString().slice(0, 10)   // 'YYYY-MM-DD'
 
 export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onSaved }) {
   const { labelMap: apiLabelMap, colorMap: apiColorMap } = useDisciplinas()
+  const { brandingPDF } = useNegocio()
   const DISC_LABEL = { ...DISC_LABEL_FB, ...apiLabelMap }
   const DISC_COLOR = { ...DISC_COLOR_FB, ...apiColorMap }
 
@@ -76,7 +78,7 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
   }
 
   function exportar() {
-    abrirPDFLiquidaciones([{ ...p, monto_final: montoNum }], mesLabel, DISC_LABEL)
+    abrirPDFLiquidaciones([{ ...p, monto_final: montoNum }], mesLabel, DISC_LABEL, brandingPDF)
   }
 
   async function marcarPagada() {
