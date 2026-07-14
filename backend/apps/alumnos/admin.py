@@ -1,10 +1,10 @@
 from django.contrib import admin
 from django.db.models import Count
 from urllib.parse import urlencode
-from .models import Alumno
+from .models import Alumno, Sede, sede_labels
 
 FILTROS_LABELS = {
-    'sede':       {'107': 'Athlon 107', '24': 'Athlon 24'},
+    'sede':       None,   # etiquetas dinámicas desde el modelo Sede
     'disciplina': {'CF': 'Crossfit', 'HF': 'Heavy Funcional', 'HX': 'Hyrox',
                    'TN': 'Teens', 'KD': 'Kids', 'BP': 'Bonus'},
     'frecuencia': {'2x': '2x/sem', '3x': '3x/sem', '5x': '5x/sem', 'libre': 'Pase Libre'},
@@ -79,7 +79,7 @@ class SedeConConteoFilter(admin.SimpleListFilter):
             .annotate(total=Count('id'))
             .order_by('sede')
         )
-        labels = {'107': 'Athlon 107', '24': 'Athlon 24'}
+        labels = sede_labels()
         return [
             (item['sede'], f"{labels.get(item['sede'], item['sede'])} ({item['total']})")
             for item in conteos
@@ -172,3 +172,9 @@ class AlumnoAdmin(admin.ModelAdmin):
 
         extra_context['filtros_activos'] = filtros_activos
         return super().changelist_view(request, extra_context=extra_context)
+
+
+@admin.register(Sede)
+class SedeAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'codigo', 'orden', 'activa']
+    list_editable = ['orden', 'activa']

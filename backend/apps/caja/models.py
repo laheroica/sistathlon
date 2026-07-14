@@ -1,11 +1,9 @@
 from django.db import models
-from apps.alumnos.models import Sede
 
 DENOMINACIONES = [20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10]
 
-# Sedes válidas para gastos: además de las dos, "general" (gastos/inversiones
-# que sirven a ambas sucursales, ej. ropa, sogas). Los alumnos NO usan 'general'.
-SEDE_GASTO_CHOICES = list(Sede.choices) + [('general', 'General')]
+# Los gastos pueden ir a una sede (código dinámico) o a 'general' (gastos/
+# inversiones que sirven a todas las sucursales). Los alumnos NO usan 'general'.
 
 # ── Gastos ────────────────────────────────────────────────────────────────────
 
@@ -33,7 +31,7 @@ CONCEPTOS_COMPARTIDOS = frozenset([
 
 class ArqueoCaja(models.Model):
     fecha = models.DateField()
-    sede = models.CharField(max_length=10, choices=Sede.choices)
+    sede = models.CharField(max_length=10)
     saldo_inicial = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     # Conteo de billetes — cantidad de cada denominación
@@ -101,7 +99,7 @@ class MovimientoCaja(models.Model):
 class GastoFijo(models.Model):
     """Gastos recurrentes/fijos: alquiler, limpieza, impuestos, servicios."""
     mes     = models.DateField(help_text='Primer día del mes')
-    sede    = models.CharField(max_length=10, choices=SEDE_GASTO_CHOICES)
+    sede    = models.CharField(max_length=10)
     concepto = models.CharField(max_length=20, choices=CONCEPTOS_FIJOS)
     importe = models.DecimalField(max_digits=12, decimal_places=2)
     fecha   = models.DateField()
@@ -119,7 +117,7 @@ class GastoFijo(models.Model):
 class GastoExtra(models.Model):
     """Gastos puntuales con concepto libre, precio unitario y cantidad."""
     mes             = models.DateField(help_text='Primer día del mes')
-    sede            = models.CharField(max_length=10, choices=SEDE_GASTO_CHOICES)
+    sede            = models.CharField(max_length=10)
     concepto        = models.CharField(max_length=200)
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
     cantidad        = models.DecimalField(max_digits=8, decimal_places=2, default=1)

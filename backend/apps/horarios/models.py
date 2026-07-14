@@ -1,5 +1,5 @@
 from django.db import models
-from apps.alumnos.models import Sede, Disciplina
+from apps.alumnos.models import Disciplina
 from apps.profes.models import Profe
 
 
@@ -14,7 +14,7 @@ class DiaSemana(models.TextChoices):
 
 class HorarioMaestro(models.Model):
     """Grilla base de referencia con historial de versiones por fecha_desde."""
-    sede = models.CharField(max_length=10, choices=Sede.choices)
+    sede = models.CharField(max_length=10)
     dia = models.CharField(max_length=5, choices=DiaSemana.choices)
     hora = models.TimeField()
     disciplina = models.CharField(max_length=5, choices=Disciplina.choices)
@@ -39,7 +39,7 @@ class HorarioMaestro(models.Model):
 class HorarioReal(models.Model):
     """Modificaciones semana a semana sobre la grilla maestra."""
     semana_inicio = models.DateField(help_text='Lunes de la semana')
-    sede = models.CharField(max_length=10, choices=Sede.choices)
+    sede = models.CharField(max_length=10)
     fecha = models.DateField()
     hora = models.TimeField()
     disciplina = models.CharField(max_length=5, choices=Disciplina.choices)

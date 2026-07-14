@@ -3,11 +3,11 @@ from rest_framework import generics, filters
 from rest_framework.decorators import api_view
 from rest_framework.permissions import IsAuthenticated, SAFE_METHODS, BasePermission
 from rest_framework.response import Response
-from .models import Alumno, EstadoAlumno, DiscipConfig, NegocioConfig
+from .models import Alumno, EstadoAlumno, DiscipConfig, NegocioConfig, Sede
 from .serializers import (
     AlumnoListSerializer, AlumnoDetailSerializer,
     AlumnoCreateSerializer, AlumnoPatchSerializer,
-    DiscipConfigSerializer, NegocioConfigSerializer,
+    DiscipConfigSerializer, NegocioConfigSerializer, SedeSerializer,
 )
 from .auth_views import get_rol
 
@@ -29,6 +29,21 @@ class NegocioConfigView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return NegocioConfig.get()
+
+
+# ── Sedes / sucursales (ABM dinámico) ──────────────────────────────────────────
+
+class SedeListCreateView(generics.ListCreateAPIView):
+    serializer_class   = SedeSerializer
+    permission_classes = [SadminOrReadOnly]   # lectura pública (filtros), escritura sadmin
+    pagination_class   = None
+    queryset           = Sede.objects.all()
+
+
+class SedeDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class   = SedeSerializer
+    permission_classes = [SadminOrReadOnly]
+    queryset           = Sede.objects.all()
 
 
 # ── Disciplinas (ABM dinámico) ─────────────────────────────────────────────────

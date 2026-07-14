@@ -205,7 +205,7 @@ def personalizado(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def anual(request):
-    from apps.alumnos.models import Alumno
+    from apps.alumnos.models import Alumno, Sede
     from apps.pagos.models import Pago
     from apps.liquidaciones.models import Liquidacion
     from apps.caja.models import GastoFijo, GastoExtra
@@ -243,54 +243,64 @@ def anual(request):
         .annotate(cant=Count('id'), total=Sum('monto'))
     )
 
-    # Helper: acumula un monto en el dict del bucket de sede correspondiente
-    def _acum(d107, d24, dgen, mes, sede, monto):
-        if sede == '107':
-            d107[mes] = d107.get(mes, 0) + monto
-        elif sede == '24':
-            d24[mes] = d24.get(mes, 0) + monto
-        else:  # general
-            dgen[mes] = dgen.get(mes, 0) + monto
+    # ── Sedes activas (dinámico) ──────────────────────────────────────────────
+    codes = list(
+        Sede.objects.filter(activa=True).order_by('orden', 'codigo')
+        .values_list('codigo', flat=True)
+    )
+    all_buckets = codes + ['general']
+
+    def dest_gasto(sede):
+        """Sede destino de un gasto: su código si existe, o 'general'."""
+        return sede if sede in codes else 'general'
+
+    # Helper: acumula un monto en buckets[sede][mes]
+    def _acum(buckets, mes, sede, monto):
+        b = buckets.setdefault(sede, {})
+        b[mes] = b.get(mes, 0) + monto
 
     # ── Liquidaciones profes (prorrateado por sede según clases del detalle) ───
-    # Sin clases (ej. sueldo fijo): según la sede del profe. 'ambas' → 50/50,
-    # 'general' → bucket general, '107'/'24' → esa sede.
-    liq_by_mes    = {}
-    liq107_by_mes = {}; liq24_by_mes = {}; liqgen_by_mes = {}
+    # Sin clases (ej. sueldo fijo): según la sede del profe. 'ambas' → reparte en
+    # partes iguales, 'general' → bucket general, un código → esa sede.
+    liq_by_mes = {}
+    liq_sede   = {}   # {sede: {mes: monto}}
     for liq in Liquidacion.objects.filter(mes__in=meses, confirmada=True).select_related('profe'):
         monto = float(liq.monto_final)
         clases = liq.detalle or []
         liq_by_mes[liq.mes] = liq_by_mes.get(liq.mes, 0) + monto
         if clases:
-            n107 = sum(1 for c in clases if c.get('sede') == '107')
-            n24  = sum(1 for c in clases if c.get('sede') == '24')
             total = len(clases)
-            liq107_by_mes[liq.mes] = liq107_by_mes.get(liq.mes, 0) + monto * n107 / total
-            liq24_by_mes[liq.mes]  = liq24_by_mes.get(liq.mes, 0) + monto * n24 / total
+            for c in codes:
+                n = sum(1 for cl in clases if cl.get('sede') == c)
+                if n:
+                    _acum(liq_sede, liq.mes, c, monto * n / total)
+            n_otras = sum(1 for cl in clases if cl.get('sede') not in codes)
+            if n_otras:
+                _acum(liq_sede, liq.mes, 'general', monto * n_otras / total)
         else:
             sede_p = liq.profe.sede
-            if sede_p == 'general':
-                liqgen_by_mes[liq.mes] = liqgen_by_mes.get(liq.mes, 0) + monto
-            elif sede_p in ('107', '24'):
-                _acum(liq107_by_mes, liq24_by_mes, liqgen_by_mes, liq.mes, sede_p, monto)
-            else:  # ambas
-                liq107_by_mes[liq.mes] = liq107_by_mes.get(liq.mes, 0) + monto / 2
-                liq24_by_mes[liq.mes]  = liq24_by_mes.get(liq.mes, 0) + monto / 2
+            if sede_p in codes:
+                _acum(liq_sede, liq.mes, sede_p, monto)
+            elif sede_p == 'ambas' and codes:
+                for c in codes:
+                    _acum(liq_sede, liq.mes, c, monto / len(codes))
+            else:  # 'general' o sede inexistente
+                _acum(liq_sede, liq.mes, 'general', monto)
 
-    # ── Gastos fijos (por sede; los compartidos ya vienen divididos ÷2) ────────
-    gfijo_by_mes    = {}
-    gfijo107_by_mes = {}; gfijo24_by_mes = {}; gfijogen_by_mes = {}
+    # ── Gastos fijos (por sede; los compartidos ya vienen divididos) ──────────
+    gfijo_by_mes = {}
+    gfijo_sede   = {}
     for row in (
         GastoFijo.objects.filter(mes__in=meses)
         .values('mes', 'sede').annotate(total=Sum('importe'))
     ):
         t = float(row['total'])
         gfijo_by_mes[row['mes']] = gfijo_by_mes.get(row['mes'], 0) + t
-        _acum(gfijo107_by_mes, gfijo24_by_mes, gfijogen_by_mes, row['mes'], row['sede'], t)
+        _acum(gfijo_sede, row['mes'], dest_gasto(row['sede']), t)
 
     # ── Gastos extras (precio_unitario * cantidad, por sede) ──────────────────
-    gextra_by_mes    = {}
-    gextra107_by_mes = {}; gextra24_by_mes = {}; gextragen_by_mes = {}
+    gextra_by_mes = {}
+    gextra_sede   = {}
     for row in (
         GastoExtra.objects.filter(mes__in=meses)
         .annotate(subtotal=ExpressionWrapper(
@@ -302,7 +312,7 @@ def anual(request):
     ):
         t = float(row['total'])
         gextra_by_mes[row['mes']] = gextra_by_mes.get(row['mes'], 0) + t
-        _acum(gextra107_by_mes, gextra24_by_mes, gextragen_by_mes, row['mes'], row['sede'], t)
+        _acum(gextra_sede, row['mes'], dest_gasto(row['sede']), t)
 
     # ── Nuevos alumnos por mes ────────────────────────────────────────────────
     nuevos_by_mes = {}
@@ -320,57 +330,45 @@ def anual(request):
     # ── Build series ──────────────────────────────────────────────────────────
     series = []
     for mes in meses:
-        r107 = pagos_by_key.get((mes, '107'), {'total': 0, 'cant': 0})
-        r24  = pagos_by_key.get((mes, '24'),  {'total': 0, 'cant': 0})
-        rec  = r107['total'] + r24['total']
-        pag  = r107['cant']  + r24['cant']
+        rec_por = {c: pagos_by_key.get((mes, c), {'total': 0, 'cant': 0}) for c in codes}
+        rec = sum(v['total'] for v in rec_por.values())
+        pag = sum(v['cant'] for v in rec_por.values())
 
         gp = liq_by_mes.get(mes, 0)
         gf = gfijo_by_mes.get(mes, 0)
         ge = gextra_by_mes.get(mes, 0)
         gt = gp + gf + ge
 
-        # Gastos por sede (107 / 24 / general)
-        gp107 = liq107_by_mes.get(mes, 0);  gp24 = liq24_by_mes.get(mes, 0);  gpgen = liqgen_by_mes.get(mes, 0)
-        gf107 = gfijo107_by_mes.get(mes, 0); gf24 = gfijo24_by_mes.get(mes, 0); gfgen = gfijogen_by_mes.get(mes, 0)
-        ge107 = gextra107_by_mes.get(mes, 0); ge24 = gextra24_by_mes.get(mes, 0); gegen = gextragen_by_mes.get(mes, 0)
-        gt107 = gp107 + gf107 + ge107
-        gt24  = gp24  + gf24  + ge24
-        gtgen = gpgen + gfgen + gegen
-
-        series.append({
+        row = {
             'mes':        mes.strftime('%b %y'),
             'mes_key':    mes.strftime('%Y-%m'),
             'recaudado':  round(rec),
-            'rec_107':    round(r107['total']),
-            'rec_24':     round(r24['total']),
             'pagadores':  pag,
-            'pag_107':    r107['cant'],
-            'pag_24':     r24['cant'],
             'ticket':     round(rec / pag) if pag else 0,
-            'ticket_107': round(r107['total'] / r107['cant']) if r107['cant'] else 0,
-            'ticket_24':  round(r24['total'] / r24['cant']) if r24['cant'] else 0,
             'g_profes':   round(gp),
             'g_fijos':    round(gf),
             'g_extras':   round(ge),
             'gastos':     round(gt),
             'balance':    round(rec - gt),
-            # Gastos y balance por sede
-            'gastos_107':  round(gt107),
-            'gastos_24':   round(gt24),
-            'gastos_general': round(gtgen),
-            'g_profes_107': round(gp107), 'g_profes_24': round(gp24), 'g_profes_general': round(gpgen),
-            'g_fijos_107':  round(gf107), 'g_fijos_24':  round(gf24),  'g_fijos_general':  round(gfgen),
-            'g_extras_107': round(ge107), 'g_extras_24': round(ge24),  'g_extras_general': round(gegen),
-            'balance_107': round(r107['total'] - gt107),
-            'balance_24':  round(r24['total'] - gt24),
-            # General no tiene ingresos propios; su "balance" es el gasto en negativo
-            'rec_general':     0,
-            'pag_general':     0,
-            'ticket_general':  0,
-            'balance_general': round(-gtgen),
             'nuevos':     nuevos_by_mes.get(mes, 0),
-        })
+        }
+        # Desglose por sede (código dinámico) + 'general'. Se emiten claves con
+        # sufijo por código (rec_<code>, gastos_<code>, …) para cada bucket.
+        for c in all_buckets:
+            r   = rec_por.get(c, {'total': 0, 'cant': 0})
+            gpc = liq_sede.get(c, {}).get(mes, 0)
+            gfc = gfijo_sede.get(c, {}).get(mes, 0)
+            gec = gextra_sede.get(c, {}).get(mes, 0)
+            gtc = gpc + gfc + gec
+            row[f'rec_{c}']      = round(r['total'])
+            row[f'pag_{c}']      = r['cant']
+            row[f'ticket_{c}']   = round(r['total'] / r['cant']) if r['cant'] else 0
+            row[f'g_profes_{c}'] = round(gpc)
+            row[f'g_fijos_{c}']  = round(gfc)
+            row[f'g_extras_{c}'] = round(gec)
+            row[f'gastos_{c}']   = round(gtc)
+            row[f'balance_{c}']  = round(r['total'] - gtc)
+        series.append(row)
 
     # Variación neta y estimación de abandonos
     for i, s in enumerate(series):
@@ -458,8 +456,14 @@ def mes_detalle(request):
     except Exception:
         return Response({'error': 'mes inválido. Usar YYYY-MM.'}, status=400)
 
+    from apps.alumnos.models import Sede
+    _codes = list(
+        Sede.objects.filter(activa=True).order_by('orden', 'codigo')
+        .values_list('codigo', flat=True)
+    )
+
     def buckets():
-        return {'107': 0.0, '24': 0.0, 'general': 0.0}
+        return {**{c: 0.0 for c in _codes}, 'general': 0.0}
 
     def con_total(b):
         return {k: round(v) for k, v in b.items()} | {'total': round(sum(b.values()))}

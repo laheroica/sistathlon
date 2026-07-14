@@ -1,5 +1,4 @@
 from django.db import models
-from apps.alumnos.models import Sede
 
 CATEGORIAS = [
     ('indumentaria', 'Indumentaria'),
@@ -42,7 +41,7 @@ class Venta(models.Model):
         null=True, blank=True, related_name='ventas'
     )
     comprador_nombre = models.CharField(max_length=100, blank=True)
-    sede             = models.CharField(max_length=10, choices=Sede.choices)
+    sede             = models.CharField(max_length=10)
     metodo_pago      = models.CharField(max_length=20, choices=METODOS_VENTA)
     total            = models.DecimalField(max_digits=12, decimal_places=2)
     registrado_por   = models.ForeignKey(

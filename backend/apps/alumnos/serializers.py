@@ -1,5 +1,13 @@
 from rest_framework import serializers
-from .models import Alumno, DiscipConfig, NegocioConfig
+from .models import Alumno, DiscipConfig, NegocioConfig, Sede
+
+
+# ── Sedes (sucursales) ──────────────────────────────────────────────────────────
+
+class SedeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Sede
+        fields = ['id', 'codigo', 'nombre', 'orden', 'activa']
 
 
 # ── Disciplinas ────────────────────────────────────────────────────────────────

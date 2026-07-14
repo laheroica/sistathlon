@@ -2,9 +2,23 @@ from django.db import models
 from django.utils import timezone
 
 
-class Sede(models.TextChoices):
-    ATHLON_107 = '107', 'Athlon 107'
-    ATHLON_24 = '24', 'Athlon 24'
+class Sede(models.Model):
+    """Sucursal del negocio. Editable: se pueden dar de alta nuevas."""
+    codigo = models.CharField(max_length=10, unique=True, help_text='Código interno estable (ej: 107). No cambiar una vez creado.')
+    nombre = models.CharField(max_length=60, help_text='Nombre visible (ej: Athlon 107)')
+    orden  = models.IntegerField(default=0)
+    activa = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['orden', 'codigo']
+
+    def __str__(self):
+        return self.nombre
+
+
+def sede_labels():
+    """Mapa {codigo: nombre} de las sedes existentes, para etiquetar en admin/reportes."""
+    return {s.codigo: s.nombre for s in Sede.objects.all()}
 
 
 class Disciplina(models.TextChoices):
@@ -61,7 +75,7 @@ class Alumno(models.Model):
     fecha_nacimiento = models.DateField(blank=True, null=True)
 
     # Pertenencia y actividad
-    sede = models.CharField(max_length=10, choices=Sede.choices)
+    sede = models.CharField(max_length=10)  # código de Sede; dinámico
     fecha_inicio = models.DateField()
     disciplina = models.CharField(max_length=5, choices=Disciplina.choices)
     frecuencia = models.CharField(max_length=10, choices=Frecuencia.choices)

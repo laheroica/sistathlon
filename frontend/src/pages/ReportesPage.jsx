@@ -94,6 +94,7 @@ function mesActualKey() {
 }
 
 function ReportePersonalizado() {
+  const { sedeOptions } = useNegocio()
   const [sede, setSede] = useState('')
   const [mes, setMes]   = useState(mesActualKey())
   const [seleccionadas, setSeleccionadas] = useState([])
@@ -130,7 +131,7 @@ function ReportePersonalizado() {
         <input type="month" value={mes} onChange={e => { setMes(e.target.value); setGrupoAbierto(null) }}
           className="bg-dark-bg border border-dark-border rounded-lg px-3 py-1.5 text-xs text-dark-text" />
         <div className="flex gap-1 bg-dark-bg rounded-xl p-1 border border-dark-border">
-          {[['', 'Ambas'], ['107', '107'], ['24', '24']].map(([v, l]) => (
+          {[['', 'Ambas'], ...sedeOptions.map(s => [s.val, s.val])].map(([v, l]) => (
             <button key={v} onClick={() => { setSede(v); setGrupoAbierto(null) }}
               className={clsx('px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
                 sede === v ? 'bg-indigo-700 text-white' : 'text-dark-muted hover:text-dark-text'
@@ -220,7 +221,7 @@ function ReportePersonalizado() {
 
 export default function ReportesPage() {
   const { user } = useAuth()
-  const { sede1, sede2 } = useNegocio()
+  const { sedeOptions, sedeLabel, sedeColor } = useNegocio()
   const puedeVerDetalle = user?.rol === 'sadmin'
   const [sede, setSede]   = useState('')
   const [meses, setMeses] = useState(12)
@@ -237,7 +238,7 @@ export default function ReportesPage() {
 
   const seriesFiltradas = series.map(s => {
     if (!sede) return s
-    const suf = sede === '107' ? '_107' : sede === '24' ? '_24' : '_general'
+    const suf = '_' + sede
     return {
       ...s,
       recaudado: s['rec' + suf],
@@ -270,10 +271,11 @@ export default function ReportesPage() {
     fill:  METODO_COLOR[m.metodo] ?? C.slate,
   }))
 
-  const sedeData = [
-    { sede: sede1, cant: snapshot.por_sede?.find(s => s.sede === '107')?.cant ?? 0, fill: C.emerald },
-    { sede: sede2, cant: snapshot.por_sede?.find(s => s.sede === '24')?.cant  ?? 0, fill: C.sky },
-  ]
+  const sedeData = sedeOptions.map(o => ({
+    sede: o.label,
+    cant: snapshot.por_sede?.find(s => s.sede === o.val)?.cant ?? 0,
+    fill: o.color,
+  }))
 
   const totalActivos       = snapshot.total_activos ?? 0
   const mesSnapshot        = snapshot.mes_snapshot ?? ''
@@ -303,7 +305,7 @@ export default function ReportesPage() {
             ))}
           </div>
           <div className="flex gap-1 bg-dark-surface rounded-xl p-1 border border-dark-border">
-            {[['', 'Todas'], ['107', '107'], ['24', '24'], ['general', 'Gral']].map(([v, l]) => (
+            {[['', 'Todas'], ...sedeOptions.map(s => [s.val, s.val]), ['general', 'Gral']].map(([v, l]) => (
               <button key={v} onClick={() => setSede(v)}
                 className={clsx('px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
                   sede === v ? 'bg-indigo-700 text-white' : 'text-dark-muted hover:text-dark-text'
@@ -407,15 +409,15 @@ export default function ReportesPage() {
               <Tooltip content={<TT />} />
               <Legend wrapperStyle={{ fontSize: 11, color: '#64748b' }} />
               {sede ? (
-                <Area dataKey="recaudado" name={`Athlon ${sede}`}
-                  stroke={sede === '107' ? C.emerald : C.sky}
-                  fill={sede === '107' ? 'url(#g107)' : 'url(#g24)'}
+                <Area dataKey="recaudado" name={sede === 'general' ? 'General' : sedeLabel(sede)}
+                  stroke={sede === 'general' ? C.slate : sedeColor(sede)}
+                  fill={sede === 'general' ? C.slate : sedeColor(sede)} fillOpacity={0.12}
                   strokeWidth={2.5} dot={false} />
               ) : (
-                <>
-                  <Area dataKey="rec_107" name={sede1} stroke={C.emerald} fill="url(#g107)" strokeWidth={2} dot={false} />
-                  <Area dataKey="rec_24"  name={sede2} stroke={C.sky}     fill="url(#g24)"  strokeWidth={2} dot={false} />
-                </>
+                sedeOptions.map(o => (
+                  <Area key={o.val} dataKey={`rec_${o.val}`} name={o.label}
+                    stroke={o.color} fill={o.color} fillOpacity={0.10} strokeWidth={2} dot={false} />
+                ))
               )}
             </AreaChart>
           </ResponsiveContainer>
@@ -433,12 +435,14 @@ export default function ReportesPage() {
                 <YAxis tickFormatter={fmtMoney} tick={TICK} axisLine={false} tickLine={false} width={52} />
                 <Tooltip content={<TT />} />
                 {sede ? (
-                  <Line dataKey="ticket" name={`Ticket ${sede}`} stroke={C.indigo} strokeWidth={2.5} dot={false} />
+                  <Line dataKey="ticket" name={`Ticket ${sede === 'general' ? 'General' : sedeLabel(sede)}`} stroke={C.indigo} strokeWidth={2.5} dot={false} />
                 ) : (
                   <>
-                    <Line dataKey="ticket"     name="Total"    stroke={C.indigo}  strokeWidth={2.5} dot={false} />
-                    <Line dataKey="ticket_107" name="Sede 107" stroke={C.emerald} strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
-                    <Line dataKey="ticket_24"  name="Sede 24"  stroke={C.sky}     strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                    <Line dataKey="ticket" name="Total" stroke={C.indigo} strokeWidth={2.5} dot={false} />
+                    {sedeOptions.map(o => (
+                      <Line key={o.val} dataKey={`ticket_${o.val}`} name={o.label}
+                        stroke={o.color} strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                    ))}
                   </>
                 )}
                 <Legend wrapperStyle={{ fontSize: 11, color: '#64748b' }} />
@@ -456,12 +460,14 @@ export default function ReportesPage() {
                 <YAxis tick={TICK} axisLine={false} tickLine={false} width={32} />
                 <Tooltip content={<TT fmt={v => v} />} />
                 {sede ? (
-                  <Line dataKey="pagadores" name={`Sede ${sede}`} stroke={sede === '107' ? C.emerald : C.sky} strokeWidth={2.5} dot={false} />
+                  <Line dataKey="pagadores" name={sede === 'general' ? 'General' : sedeLabel(sede)} stroke={sede === 'general' ? C.slate : sedeColor(sede)} strokeWidth={2.5} dot={false} />
                 ) : (
                   <>
-                    <Line dataKey="pagadores" name="Total"    stroke={C.indigo}  strokeWidth={2.5} dot={false} />
-                    <Line dataKey="pag_107"   name="Sede 107" stroke={C.emerald} strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
-                    <Line dataKey="pag_24"    name="Sede 24"  stroke={C.sky}     strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                    <Line dataKey="pagadores" name="Total" stroke={C.indigo} strokeWidth={2.5} dot={false} />
+                    {sedeOptions.map(o => (
+                      <Line key={o.val} dataKey={`pag_${o.val}`} name={o.label}
+                        stroke={o.color} strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                    ))}
                   </>
                 )}
                 <Legend wrapperStyle={{ fontSize: 11, color: '#64748b' }} />
@@ -514,7 +520,7 @@ export default function ReportesPage() {
       {/* Tabla: Ingresos / Egresos / Saldo por mes */}
       <Card
         title="Ingresos, egresos y saldo por mes"
-        sub={(sede === 'general' ? 'Gastos generales' : sede ? `Athlon ${sede}` : 'Todas las sedes')
+        sub={(sede === 'general' ? 'Gastos generales' : sede ? sedeLabel(sede) : 'Todas las sedes')
           + (puedeVerDetalle ? ' · tocá un mes para ver el detalle' : '')}
         className="mb-4"
       >

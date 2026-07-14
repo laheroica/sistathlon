@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Settings, Save, Loader2, Upload, Building2 } from 'lucide-react'
+import { Settings, Save, Loader2, Upload, Building2, Plus } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/api'
 
@@ -64,6 +64,104 @@ function LogoField({ label, hint, fondo, value, onChange }) {
   )
 }
 
+// ── ABM de sedes / sucursales ──────────────────────────────────────────────────
+
+function SedeRow({ sede }) {
+  const qc = useQueryClient()
+  const [nombre, setNombre] = useState(sede.nombre)
+  useEffect(() => { setNombre(sede.nombre) }, [sede.nombre])
+  const refetch = () => qc.invalidateQueries({ queryKey: ['config-sedes'] })
+
+  async function guardarNombre() {
+    const val = nombre.trim()
+    if (!val || val === sede.nombre) { setNombre(sede.nombre); return }
+    await api.patch(`/config/sedes/${sede.id}/`, { nombre: val })
+    refetch()
+  }
+  async function toggleActiva() {
+    await api.patch(`/config/sedes/${sede.id}/`, { activa: !sede.activa })
+    refetch()
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs font-mono text-dark-muted w-12 flex-shrink-0">{sede.codigo}</span>
+      <input
+        className={clsx('input flex-1 text-sm', !sede.activa && 'opacity-50')}
+        value={nombre}
+        onChange={e => setNombre(e.target.value)}
+        onBlur={guardarNombre}
+        onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
+      />
+      <button type="button" onClick={toggleActiva}
+        className={clsx('text-xs px-2.5 py-1.5 rounded-lg border transition-colors flex-shrink-0',
+          sede.activa
+            ? 'border-dark-border text-dark-muted hover:text-amber-400'
+            : 'border-green-800/40 text-green-400 hover:text-green-300')}>
+        {sede.activa ? 'Desactivar' : 'Activar'}
+      </button>
+    </div>
+  )
+}
+
+function SedesManager() {
+  const qc = useQueryClient()
+  const { data: sedes = [], isLoading } = useQuery({
+    queryKey: ['config-sedes'],
+    queryFn: () => api.get('/config/sedes/').then(r => r.data),
+  })
+  const [nuevo, setNuevo] = useState({ codigo: '', nombre: '' })
+  const [err, setErr] = useState('')
+
+  async function agregar() {
+    setErr('')
+    const codigo = nuevo.codigo.trim()
+    const nombre = nuevo.nombre.trim()
+    if (!codigo || !nombre) { setErr('Completá código y nombre.'); return }
+    try {
+      await api.post('/config/sedes/', { codigo, nombre, orden: sedes.length + 1 })
+      setNuevo({ codigo: '', nombre: '' })
+      qc.invalidateQueries({ queryKey: ['config-sedes'] })
+    } catch (e) {
+      setErr(e.response?.status === 403
+        ? 'Solo el superadministrador puede agregar sedes.'
+        : (e.response?.data?.codigo ? 'Ese código de sede ya existe.' : 'Error al agregar la sede.'))
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-xs text-dark-muted">
+        <Building2 size={14} /> Sucursales / sedes
+      </div>
+      {isLoading ? (
+        <div className="h-16 bg-dark-bg rounded-xl animate-pulse" />
+      ) : (
+        <div className="space-y-2">
+          {sedes.map(s => <SedeRow key={s.id} sede={s} />)}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
+        <input className="input w-20 text-sm" placeholder="Código"
+          value={nuevo.codigo} onChange={e => setNuevo(n => ({ ...n, codigo: e.target.value }))} />
+        <input className="input flex-1 text-sm" placeholder="Nombre de la nueva sede"
+          value={nuevo.nombre} onChange={e => setNuevo(n => ({ ...n, nombre: e.target.value }))}
+          onKeyDown={e => e.key === 'Enter' && agregar()} />
+        <button type="button" onClick={agregar}
+          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-dark-border bg-dark-bg text-dark-muted hover:text-dark-text transition-colors flex-shrink-0">
+          <Plus size={13} /> Agregar
+        </button>
+      </div>
+      <p className="text-[11px] text-dark-muted leading-relaxed">
+        El <span className="font-mono">código</span> es un identificador interno corto y estable (ej: 107). No lo cambies después de crearlo.
+        Para dejar de usar una sede, desactivala — así no se pierden sus datos históricos.
+      </p>
+      {err && <p className="text-xs text-red-400">{err}</p>}
+    </div>
+  )
+}
+
 export default function ConfigNegocioPage() {
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
@@ -72,7 +170,7 @@ export default function ConfigNegocioPage() {
     staleTime: 0,
   })
 
-  const [form, setForm] = useState({ nombre: '', ciudad: '', logo_claro: '', logo_oscuro: '', nombre_sede1: '', nombre_sede2: '' })
+  const [form, setForm] = useState({ nombre: '', ciudad: '', logo_claro: '', logo_oscuro: '' })
   const [saving, setSaving] = useState(false)
   const [ok, setOk] = useState(false)
   const [error, setError] = useState('')
@@ -81,7 +179,6 @@ export default function ConfigNegocioPage() {
     if (data) setForm({
       nombre: data.nombre || '', ciudad: data.ciudad || '',
       logo_claro: data.logo_claro || '', logo_oscuro: data.logo_oscuro || '',
-      nombre_sede1: data.nombre_sede1 || '', nombre_sede2: data.nombre_sede2 || '',
     })
   }, [data])
 
@@ -131,17 +228,8 @@ export default function ConfigNegocioPage() {
             </div>
           </div>
 
-          <div className="border-t border-dark-border pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-dark-muted font-medium mb-1.5">Nombre de la sede 1</label>
-              <input className="input w-full text-sm" value={form.nombre_sede1}
-                onChange={e => set('nombre_sede1', e.target.value)} placeholder="Ej: Athlon 107" />
-            </div>
-            <div>
-              <label className="block text-xs text-dark-muted font-medium mb-1.5">Nombre de la sede 2</label>
-              <input className="input w-full text-sm" value={form.nombre_sede2}
-                onChange={e => set('nombre_sede2', e.target.value)} placeholder="Ej: Athlon 24" />
-            </div>
+          <div className="border-t border-dark-border pt-4">
+            <SedesManager />
           </div>
 
           <div className="border-t border-dark-border pt-4 flex items-center gap-2 text-xs text-dark-muted">

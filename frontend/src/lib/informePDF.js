@@ -35,22 +35,27 @@ function money(n, dash = true) {
   return (v < 0 ? '-$' : '$') + s
 }
 
-// Fila de la tabla ingresos/egresos (4 columnas de sede)
+// Códigos de sede a mostrar en las tablas del PDF (columnas). Se setea al
+// generar el informe según las sedes configuradas; default = Athlon 107/24.
+let PDF_SEDES = ['107', '24']
+
+// Fila de la tabla ingresos/egresos (una columna por sede + General + Total)
 function fila4(label, b, { bold = false, indent = false, color = CO.ink, muted = false, trClass = '' } = {}) {
   const w = bold ? '700' : '400'
   const lblColor = muted ? CO.muted : CO.ink
+  const td = (v, weight) => `<td style="padding:5px 10px;text-align:right;font-weight:${weight};color:${color};">${money(v || 0)}</td>`
+  const cols = PDF_SEDES.map(c => td(b[c], w)).join('')
   return `
     <tr class="${trClass}">
       <td style="padding:5px 10px;${indent ? 'padding-left:24px;' : ''}font-weight:${w};color:${lblColor};">${label}</td>
-      <td style="padding:5px 10px;text-align:right;font-weight:${w};color:${color};">${money(b['107'])}</td>
-      <td style="padding:5px 10px;text-align:right;font-weight:${w};color:${color};">${money(b['24'])}</td>
-      <td style="padding:5px 10px;text-align:right;font-weight:${w};color:${color};">${money(b.general)}</td>
-      <td style="padding:5px 10px;text-align:right;font-weight:700;color:${color};">${money(b.total)}</td>
+      ${cols}
+      ${td(b.general, w)}
+      ${td(b.total, '700')}
     </tr>`
 }
 
 function grupoLabel(txt) {
-  return `<tr><td colspan="5" style="padding:9px 10px 2px;font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${CO.muted};">${txt}</td></tr>`
+  return `<tr><td colspan="${PDF_SEDES.length + 3}" style="padding:9px 10px 2px;font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${CO.muted};">${txt}</td></tr>`
 }
 
 const SEDE_LABEL = { '107': 'Athlon 107', '24': 'Athlon 24', general: 'General' }
@@ -128,6 +133,8 @@ export function abrirInformePDF(mesKey, d, branding = {}) {
   const nombre  = branding.nombre || 'Athlon'
   const ciudad  = branding.ciudad || ''
   const sedeLabels = branding.sedeLabels || SEDE_LABEL
+  PDF_SEDES = (branding.sedeCodes && branding.sedeCodes.length) ? branding.sedeCodes : ['107', '24']
+  const colspan = PDF_SEDES.length + 3   // Concepto + sedes + General + Total
   const hoy = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
   const res = d.resultado.total
@@ -153,6 +160,7 @@ export function abrirInformePDF(mesKey, d, branding = {}) {
   }).join('')
 
   const thNum = `style="padding:6px 10px;text-align:right;font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:${CO.muted};border-bottom:1.5px solid ${CO.line};"`
+  const thSedes = PDF_SEDES.map(c => `<th ${thNum}>${sedeLabels[c] || c}</th>`).join('')
 
   const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"/>
@@ -218,7 +226,7 @@ export function abrirInformePDF(mesKey, d, branding = {}) {
     <table class="tbl">
       <thead class="thead"><tr>
         <th style="text-align:left;">Concepto</th>
-        <th ${thNum}>A107</th><th ${thNum}>A24</th><th ${thNum}>General</th><th ${thNum}>Total</th>
+        ${thSedes}<th ${thNum}>General</th><th ${thNum}>Total</th>
       </tr></thead>
       <tbody>
         ${fila4('Cuotas cobradas', d.ingresos.cuotas, { color: CO.green })}
@@ -234,25 +242,25 @@ export function abrirInformePDF(mesKey, d, branding = {}) {
     <table class="tbl">
       <thead class="thead"><tr>
         <th style="text-align:left;">Concepto</th>
-        <th ${thNum}>A107</th><th ${thNum}>A24</th><th ${thNum}>General</th><th ${thNum}>Total</th>
+        ${thSedes}<th ${thNum}>General</th><th ${thNum}>Total</th>
       </tr></thead>
       <tbody>
         ${grupoLabel('Profes')}
         ${(d.profes||[]).map(p => fila4(p.nombre, p, { indent:true })).join('')}
-        ${(d.profes||[]).length === 0 ? `<tr><td colspan="5" style="padding:4px 24px;color:#cbd5e1;">Sin liquidaciones confirmadas</td></tr>` : ''}
+        ${(d.profes||[]).length === 0 ? `<tr><td colspan="${PDF_SEDES.length + 3}" style="padding:4px 24px;color:#cbd5e1;">Sin liquidaciones confirmadas</td></tr>` : ''}
         ${fila4('Subtotal profes', d.totales.profes, { bold:true, muted:true })}
 
         ${grupoLabel('Gastos fijos')}
         ${(d.fijos||[]).map(f => fila4(f.label, f, { indent:true })).join('')}
-        ${(d.fijos||[]).length === 0 ? `<tr><td colspan="5" style="padding:4px 24px;color:#cbd5e1;">Sin gastos fijos</td></tr>` : ''}
+        ${(d.fijos||[]).length === 0 ? `<tr><td colspan="${PDF_SEDES.length + 3}" style="padding:4px 24px;color:#cbd5e1;">Sin gastos fijos</td></tr>` : ''}
         ${fila4('Subtotal fijos', d.totales.fijos, { bold:true, muted:true })}
 
         ${grupoLabel('Gastos extras')}
         ${(d.extras||[]).map(e => {
-          const b = { '107':0, '24':0, general:0, total:e.importe }; b[e.sede] = e.importe
+          const b = { general:0, total:e.importe }; PDF_SEDES.forEach(c => { b[c] = 0 }); b[e.sede] = e.importe
           return fila4(e.concepto, b, { indent:true })
         }).join('')}
-        ${(d.extras||[]).length === 0 ? `<tr><td colspan="5" style="padding:4px 24px;color:#cbd5e1;">Sin gastos extras</td></tr>` : ''}
+        ${(d.extras||[]).length === 0 ? `<tr><td colspan="${PDF_SEDES.length + 3}" style="padding:4px 24px;color:#cbd5e1;">Sin gastos extras</td></tr>` : ''}
         ${fila4('Subtotal extras', d.totales.extras, { bold:true, muted:true })}
 
         ${fila4('Total egresos', d.totales.egresos, { bold:true, color: CO.red, trClass:'totrow' })}
@@ -264,9 +272,9 @@ export function abrirInformePDF(mesKey, d, branding = {}) {
   <div class="resstrip">
     <div class="lab"><span class="k">Resultado del mes</span><span class="v">${money(res, false)}</span></div>
     <div class="cols">
-      ${['107','24','general'].map(k => `
-        <div class="c"><div class="k">${k==='general'?'General':'Athlon '+k}</div>
-          <div class="v" style="color:${d.resultado[k]>=0?CO.green:CO.red}">${money(d.resultado[k], false)}</div></div>`).join('')}
+      ${[...PDF_SEDES,'general'].map(k => `
+        <div class="c"><div class="k">${k==='general'?'General':(sedeLabels[k]||k)}</div>
+          <div class="v" style="color:${(d.resultado[k]||0)>=0?CO.green:CO.red}">${money(d.resultado[k]||0, false)}</div></div>`).join('')}
     </div>
   </div>
 

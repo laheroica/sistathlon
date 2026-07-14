@@ -1,5 +1,5 @@
 from django.db import models
-from apps.alumnos.models import Sede, Disciplina
+from apps.alumnos.models import Disciplina
 
 
 class TipoTemporal(models.TextChoices):
@@ -13,7 +13,7 @@ class AlumnoTemporal(models.Model):
     nombre = models.CharField(max_length=200)
     dni = models.CharField(max_length=20, blank=True)
     celular = models.CharField(max_length=30, blank=True)
-    sede = models.CharField(max_length=10, choices=Sede.choices)
+    sede = models.CharField(max_length=10)
     disciplina = models.CharField(max_length=5, choices=Disciplina.choices)
     tipo = models.CharField(max_length=10, choices=TipoTemporal.choices)
     fecha_inicio = models.DateField()

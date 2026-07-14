@@ -25,12 +25,8 @@ PROFES_COLORES = {
 class Profe(models.Model):
     nombre = models.CharField(max_length=100, unique=True)
     color = models.CharField(max_length=7, default='#6b7280', help_text='Hex color, ej: #22d3ee')
-    sede = models.CharField(
-        max_length=10,
-        choices=[('107', 'Athlon 107'), ('24', 'Athlon 24'),
-                 ('ambas', 'Ambas sedes'), ('general', 'General')],
-        default='ambas'
-    )
+    # Código de sede, o 'ambas' / 'general' (valores especiales). Dinámico.
+    sede = models.CharField(max_length=10, default='ambas')
     tipo_liquidacion = models.CharField(max_length=15, choices=TipoLiquidacion.choices, default=TipoLiquidacion.HORA)
     disciplinas_liquidables = models.JSONField(
         default=list, blank=True,
