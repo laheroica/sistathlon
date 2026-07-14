@@ -12,6 +12,7 @@ import CommandPalette from '../components/ui/CommandPalette'
 import FichaAlumnoPanel from '../components/alumnos/FichaAlumnoPanel'
 import SlidePanel from '../components/ui/SlidePanel'
 import { useDisciplinas } from '../hooks/useDisciplinas'
+import { useNegocio } from '../hooks/useNegocio'
 
 const TABS = [
   // "Al día" = todos los activos (el estado ya indica que están al corriente)
@@ -464,6 +465,7 @@ const MESES_RECIENTES = mesesRecientes()
 export default function AlumnosPage() {
   // Disciplinas dinámicas desde la API
   const { discs, labelMap: apiLabelMap, badgeMap: apiBadgeMap } = useDisciplinas()
+  const { sedeOptions } = useNegocio()
   const labelMap = { ...DISC_LABEL, ...apiLabelMap }
   const badgeMap = { ...DISC_BADGE, ...apiBadgeMap }
   // Orden dinámico: usar el de la API si está disponible, sino el hardcodeado
@@ -730,8 +732,7 @@ export default function AlumnosPage() {
           </div>
           <select className="input h-9 text-sm w-36" value={sede} onChange={(e) => setSede(e.target.value)}>
             <option value="">Ambas sedes</option>
-            <option value="107">Athlon 107</option>
-            <option value="24">Athlon 24</option>
+            {sedeOptions.map(s => <option key={s.val} value={s.val}>{s.label}</option>)}
           </select>
           {(sede || discFilter || freqFilter || busqueda) && (
             <button

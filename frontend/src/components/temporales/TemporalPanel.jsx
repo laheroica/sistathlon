@@ -3,11 +3,7 @@ import { useForm } from 'react-hook-form'
 import { X, Save, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../../lib/api'
-
-const SEDES = [
-  { val: '107', label: 'Athlon 107' },
-  { val: '24',  label: 'Athlon 24' },
-]
+import { useNegocio } from '../../hooks/useNegocio'
 
 const DISCIPLINAS = [
   { val: 'CF', label: 'CrossFit' },
@@ -37,6 +33,7 @@ function calcularFechaFin(fechaInicio, tipo) {
 }
 
 export default function TemporalPanel({ temporal, onClose, onSaved }) {
+  const { sedeOptions } = useNegocio()
   const isEdit = Boolean(temporal)
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
@@ -164,7 +161,7 @@ export default function TemporalPanel({ temporal, onClose, onSaved }) {
               <div>
                 <label className="block text-xs text-dark-muted font-medium mb-1.5">Sede</label>
                 <select {...register('sede')} className="input w-full text-sm">
-                  {SEDES.map(s => <option key={s.val} value={s.val}>{s.label}</option>)}
+                  {sedeOptions.map(s => <option key={s.val} value={s.val}>{s.label}</option>)}
                 </select>
               </div>
               <div>

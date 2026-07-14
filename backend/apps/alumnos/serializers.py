@@ -15,7 +15,7 @@ class DiscipConfigSerializer(serializers.ModelSerializer):
 class NegocioConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model  = NegocioConfig
-        fields = ['nombre', 'ciudad', 'logo_claro', 'logo_oscuro']
+        fields = ['nombre', 'ciudad', 'logo_claro', 'logo_oscuro', 'nombre_sede1', 'nombre_sede2']
 
 
 class AlumnoListSerializer(serializers.ModelSerializer):

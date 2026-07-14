@@ -163,6 +163,9 @@ class NegocioConfig(models.Model):
     ciudad      = models.CharField(max_length=120, blank=True, default='General Pico, La Pampa')
     logo_claro  = models.TextField(blank=True, help_text='Logo para fondo oscuro (sistema). Data URI base64.')
     logo_oscuro = models.TextField(blank=True, help_text='Logo para fondo claro (PDFs). Data URI base64.')
+    # Nombres visibles de las sedes (los códigos internos 107/24 no cambian)
+    nombre_sede1 = models.CharField(max_length=60, default='Athlon 107')
+    nombre_sede2 = models.CharField(max_length=60, default='Athlon 24')
 
     class Meta:
         verbose_name        = 'Configuración del negocio'

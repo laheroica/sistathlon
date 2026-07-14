@@ -25,12 +25,6 @@ const TIPO_COLOR = {
   mixto:      'text-amber-400 bg-amber-900/30',
 }
 
-const SEDES = [
-  { val: '', label: 'Ambas' },
-  { val: '107', label: 'Athlon 107' },
-  { val: '24',  label: 'Athlon 24' },
-]
-
 function mesStr(year, month) {
   return `${year}-${String(month).padStart(2, '0')}`
 }
@@ -54,7 +48,8 @@ export default function LiquidacionesPage() {
   const qc  = useQueryClient()
   const mes = mesStr(year, month)
   const { labelMap: discLabelMap } = useDisciplinas()
-  const { brandingPDF } = useNegocio()
+  const { brandingPDF, sedeOptions } = useNegocio()
+  const SEDES = [{ val: '', label: 'Ambas' }, ...sedeOptions]
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['liquidaciones-preview', mes],

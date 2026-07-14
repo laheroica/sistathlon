@@ -11,6 +11,7 @@ import clsx from 'clsx'
 import api from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import MesDetallePanel from '../components/reportes/MesDetallePanel'
+import { useNegocio } from '../hooks/useNegocio'
 
 const C = {
   indigo:  '#6366f1',
@@ -219,6 +220,7 @@ function ReportePersonalizado() {
 
 export default function ReportesPage() {
   const { user } = useAuth()
+  const { sede1, sede2 } = useNegocio()
   const puedeVerDetalle = user?.rol === 'sadmin'
   const [sede, setSede]   = useState('')
   const [meses, setMeses] = useState(12)
@@ -269,8 +271,8 @@ export default function ReportesPage() {
   }))
 
   const sedeData = [
-    { sede: 'Athlon 107', cant: snapshot.por_sede?.find(s => s.sede === '107')?.cant ?? 0, fill: C.emerald },
-    { sede: 'Athlon 24',  cant: snapshot.por_sede?.find(s => s.sede === '24')?.cant  ?? 0, fill: C.sky },
+    { sede: sede1, cant: snapshot.por_sede?.find(s => s.sede === '107')?.cant ?? 0, fill: C.emerald },
+    { sede: sede2, cant: snapshot.por_sede?.find(s => s.sede === '24')?.cant  ?? 0, fill: C.sky },
   ]
 
   const totalActivos       = snapshot.total_activos ?? 0
@@ -411,8 +413,8 @@ export default function ReportesPage() {
                   strokeWidth={2.5} dot={false} />
               ) : (
                 <>
-                  <Area dataKey="rec_107" name="Athlon 107" stroke={C.emerald} fill="url(#g107)" strokeWidth={2} dot={false} />
-                  <Area dataKey="rec_24"  name="Athlon 24"  stroke={C.sky}     fill="url(#g24)"  strokeWidth={2} dot={false} />
+                  <Area dataKey="rec_107" name={sede1} stroke={C.emerald} fill="url(#g107)" strokeWidth={2} dot={false} />
+                  <Area dataKey="rec_24"  name={sede2} stroke={C.sky}     fill="url(#g24)"  strokeWidth={2} dot={false} />
                 </>
               )}
             </AreaChart>

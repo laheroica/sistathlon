@@ -5,13 +5,7 @@ import clsx from 'clsx'
 import api from '../../lib/api'
 import { money } from '../../lib/format'
 import { useDisciplinas } from '../../hooks/useDisciplinas'
-
-const SEDES = [
-  { val: '107',   label: 'Athlon 107' },
-  { val: '24',    label: 'Athlon 24' },
-  { val: 'ambas', label: 'Ambas sedes' },
-  { val: 'general', label: 'General (gerencia)' },
-]
+import { useNegocio } from '../../hooks/useNegocio'
 
 const TIPOS = [
   { val: 'hora',       label: 'Por hora' },
@@ -32,6 +26,12 @@ const hoyMes = () => {
 }
 
 export default function ProfePanel({ profe, onClose, onSaved }) {
+  const { sedeOptions } = useNegocio()
+  const SEDES = [
+    ...sedeOptions,
+    { val: 'ambas',   label: 'Ambas sedes' },
+    { val: 'general', label: 'General (gerencia)' },
+  ]
   const isEdit = Boolean(profe)
   const [saving,       setSaving]       = useState(false)
   const [error,        setError]        = useState('')

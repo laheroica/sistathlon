@@ -5,15 +5,10 @@ import clsx from 'clsx'
 import api from '../lib/api'
 import { money } from '../lib/format'
 import TemporalPanel from '../components/temporales/TemporalPanel'
+import { useNegocio } from '../hooks/useNegocio'
 
 const DISC_LABEL = { CF: 'CrossFit', HF: 'Heavy Func.', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus' }
 const TIPO_LABEL = { clase: 'Clase suelta', semana: 'Semana', quincena: 'Quincena', mes: 'Mes completo' }
-
-const SEDES = [
-  { val: '',    label: 'Ambas' },
-  { val: '107', label: 'Athlon 107' },
-  { val: '24',  label: 'Athlon 24' },
-]
 
 const ESTADOS = [
   { val: 'activo',  label: 'Activos',  color: 'text-green-400',  bg: 'bg-green-900/40',  border: 'border-green-800/40' },
@@ -22,6 +17,8 @@ const ESTADOS = [
 ]
 
 export default function TemporalesPage() {
+  const { sedeOptions } = useNegocio()
+  const SEDES = [{ val: '', label: 'Ambas' }, ...sedeOptions]
   const [sede,   setSede]   = useState('')
   const [estado, setEstado] = useState('activo')
   const [panel,  setPanel]  = useState(null) // null | 'nuevo' | { temporal }

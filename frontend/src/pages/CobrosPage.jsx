@@ -4,6 +4,7 @@ import { DollarSign, X, Save, Loader2, CheckCircle, Clock, AlertCircle, ArrowRig
 import clsx from 'clsx'
 import api from '../lib/api'
 import { money } from '../lib/format'
+import { useNegocio } from '../hooks/useNegocio'
 
 const METODOS = [
   { val: 'efectivo',       label: 'Efectivo' },
@@ -299,6 +300,7 @@ function LiquidacionDayTab({ mes }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CobrosPage() {
   const qc = useQueryClient()
+  const { sedeOptions } = useNegocio()
   const [mes, setMes] = useState(mesPorDefecto)
   const [tab, setTab] = useState('todos')
   const [sedeFilter, setSedeFilter] = useState('')
@@ -428,8 +430,7 @@ export default function CobrosPage() {
             className="input text-sm px-3 py-2"
           >
             <option value="">Ambas sedes</option>
-            <option value="107">Athlon 107</option>
-            <option value="24">Athlon 24</option>
+            {sedeOptions.map(s => <option key={s.val} value={s.val}>{s.label}</option>)}
           </select>
           <input
             type="month" value={mes}

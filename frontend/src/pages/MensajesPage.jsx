@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/api'
+import { useNegocio } from '../hooks/useNegocio'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -323,6 +324,7 @@ function TabBienvenidas({ sede }) {
 // ---------------------------------------------------------------------------
 
 function TabMasivos() {
+  const { sedeOptions } = useNegocio()
   const [sede, setSede] = useState('')
   const [disciplina, setDisc] = useState('')
   const [texto, setTexto] = useState('Hola {nombre}! 👋 Te escribimos desde Athlon. ')
@@ -379,8 +381,7 @@ function TabMasivos() {
             <label className="text-xs text-dark-muted mb-1 block">Sede</label>
             <select value={sede} onChange={e => setSede(e.target.value)} className="input text-sm w-full">
               <option value="">Ambas sedes</option>
-              <option value="107">Athlon 107</option>
-              <option value="24">Athlon 24</option>
+              {sedeOptions.map(s => <option key={s.val} value={s.val}>{s.label}</option>)}
             </select>
           </div>
           <div>

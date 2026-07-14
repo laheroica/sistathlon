@@ -9,6 +9,7 @@ import clsx from 'clsx'
 import api from '../lib/api'
 import ArqueoPanel from '../components/caja/ArqueoPanel'
 import { money } from '../lib/format'
+import { useNegocio } from '../hooks/useNegocio'
 
 function mesLabel(yyyy, mm) {
   const d = new Date(yyyy, mm - 1, 1)
@@ -16,13 +17,9 @@ function mesLabel(yyyy, mm) {
     .replace(/^\w/, c => c.toUpperCase())
 }
 
-const SEDES = [
-  { val: '', label: 'Ambas sedes' },
-  { val: '107', label: 'Athlon 107' },
-  { val: '24',  label: 'Athlon 24' },
-]
-
 export default function CajaPage() {
+  const { sedeOptions } = useNegocio()
+  const SEDES = [{ val: '', label: 'Ambas sedes' }, ...sedeOptions]
   const hoy        = new Date()
   const [anio, setAnio] = useState(hoy.getFullYear())
   const [mes,  setMes]  = useState(hoy.getMonth() + 1)

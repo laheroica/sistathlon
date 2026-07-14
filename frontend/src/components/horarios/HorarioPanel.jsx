@@ -4,6 +4,7 @@ import { X, Save, Loader2, CalendarClock } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../../lib/api'
 import { useDisciplinas } from '../../hooks/useDisciplinas'
+import { useNegocio } from '../../hooks/useNegocio'
 
 const DIAS = [
   { val: 'lun', label: 'Lunes' },
@@ -14,10 +15,6 @@ const DIAS = [
   { val: 'sab', label: 'Sábado' },
 ]
 
-const SEDES = [
-  { val: '107', label: 'Athlon 107' },
-  { val: '24',  label: 'Athlon 24' },
-]
 
 function toISO(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
@@ -33,6 +30,7 @@ function proximoLunes() {
 }
 
 export default function HorarioPanel({ horario, defaultDia, defaultSede, profes, onClose, onSaved }) {
+  const { sedeOptions: SEDES } = useNegocio()
   const isEdit = Boolean(horario)
 
   const hoy   = toISO(new Date())

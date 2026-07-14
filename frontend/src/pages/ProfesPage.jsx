@@ -5,11 +5,13 @@ import clsx from 'clsx'
 import api from '../lib/api'
 import { money } from '../lib/format'
 import ProfePanel from '../components/profes/ProfePanel'
+import { useNegocio } from '../hooks/useNegocio'
 
 const TIPO_LABEL = { hora: 'Por hora', porcentaje: '% recaudación', fijo: 'Sueldo fijo', mixto: 'Horas + %' }
-const SEDE_LABEL = { '107': 'Athlon 107', '24': 'Athlon 24', ambas: 'Ambas sedes' }
 
 export default function ProfesPage() {
+  const { sedeLabels } = useNegocio()
+  const SEDE_LABEL = { ...sedeLabels, ambas: 'Ambas sedes' }
   const [soloActivos, setSoloActivos] = useState(true)
   const [panel, setPanel] = useState(null)
   const qc = useQueryClient()

@@ -3,16 +3,13 @@ import { X, Save, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../../lib/api'
 import { money } from '../../lib/format'
-
-const SEDES = [
-  { val: '107', label: 'Athlon 107' },
-  { val: '24',  label: 'Athlon 24' },
-  { val: 'general', label: 'General' },
-]
+import { useNegocio } from '../../hooks/useNegocio'
 
 function hoy() { return new Date().toISOString().slice(0, 10) }
 
 export default function GastoExtraPanel({ extra, mes, onClose, onSaved }) {
+  const { sedeOptions } = useNegocio()
+  const SEDES = [...sedeOptions, { val: 'general', label: 'General' }]
   const isEdit = Boolean(extra)
 
   const [sede,     setSede]     = useState(extra?.sede     ?? '107')

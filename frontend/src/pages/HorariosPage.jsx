@@ -6,6 +6,7 @@ import api from '../lib/api'
 import HorarioPanel from '../components/horarios/HorarioPanel'
 import ModificacionPanel from '../components/horarios/ModificacionPanel'
 import { useDisciplinas } from '../hooks/useDisciplinas'
+import { useNegocio } from '../hooks/useNegocio'
 
 const DIAS_SEMANA = [
   { val: 'lun', label: 'Lunes',     dow: 1 },
@@ -23,11 +24,6 @@ const MESES_CORTO = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct'
 const DISC_LABEL_FB = { CF: 'CrossFit', HF: 'Heavy', HX: 'Hyrox', FB: 'FullBody', TN: 'Teens', KD: 'Kids', BP: 'Bonus' }
 const DISC_COLOR_FB = { CF: '#3b82f6', HF: '#22c55e', HX: '#eab308', FB: '#f97316', TN: '#a855f7', KD: '#ec4899', BP: '#0ea5e9' }
 const DISC_ORDER_FB = { CF: 0, HX: 1, FB: 2, HF: 3, TN: 4, KD: 5, BP: 6 }
-
-const SEDES = [
-  { val: '107', label: 'Athlon 107' },
-  { val: '24',  label: 'Athlon 24' },
-]
 
 // ── Helpers de fecha ──────────────────────────────────────────────────────────
 function lunesDe(date) {
@@ -60,6 +56,7 @@ function fmtSemana(lunes) {
 
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function HorariosPage() {
+  const { sedeOptions } = useNegocio()
   const [vista,  setVista]  = useState('semana')   // 'semana' | 'maestra'
   const [sede,   setSede]   = useState('107')
   const [lunes,  setLunes]  = useState(() => lunesDe(new Date()))
@@ -263,7 +260,7 @@ export default function HorariosPage() {
 
           {/* Sede */}
           <div className="flex gap-1">
-            {SEDES.map(s => (
+            {sedeOptions.map(s => (
               <button key={s.val} onClick={() => setSede(s.val)}
                 className={clsx('px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
                   sede === s.val ? 'bg-indigo-900/40 text-indigo-400 border-indigo-800/40' : 'bg-dark-surface text-dark-muted border-dark-border hover:text-dark-text'

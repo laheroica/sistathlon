@@ -72,7 +72,7 @@ export default function ConfigNegocioPage() {
     staleTime: 0,
   })
 
-  const [form, setForm] = useState({ nombre: '', ciudad: '', logo_claro: '', logo_oscuro: '' })
+  const [form, setForm] = useState({ nombre: '', ciudad: '', logo_claro: '', logo_oscuro: '', nombre_sede1: '', nombre_sede2: '' })
   const [saving, setSaving] = useState(false)
   const [ok, setOk] = useState(false)
   const [error, setError] = useState('')
@@ -81,6 +81,7 @@ export default function ConfigNegocioPage() {
     if (data) setForm({
       nombre: data.nombre || '', ciudad: data.ciudad || '',
       logo_claro: data.logo_claro || '', logo_oscuro: data.logo_oscuro || '',
+      nombre_sede1: data.nombre_sede1 || '', nombre_sede2: data.nombre_sede2 || '',
     })
   }, [data])
 
@@ -127,6 +128,19 @@ export default function ConfigNegocioPage() {
               <label className="block text-xs text-dark-muted font-medium mb-1.5">Ciudad / ubicación</label>
               <input className="input w-full text-sm" value={form.ciudad}
                 onChange={e => set('ciudad', e.target.value)} placeholder="Ej: General Pico, La Pampa" />
+            </div>
+          </div>
+
+          <div className="border-t border-dark-border pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-dark-muted font-medium mb-1.5">Nombre de la sede 1</label>
+              <input className="input w-full text-sm" value={form.nombre_sede1}
+                onChange={e => set('nombre_sede1', e.target.value)} placeholder="Ej: Athlon 107" />
+            </div>
+            <div>
+              <label className="block text-xs text-dark-muted font-medium mb-1.5">Nombre de la sede 2</label>
+              <input className="input w-full text-sm" value={form.nombre_sede2}
+                onChange={e => set('nombre_sede2', e.target.value)} placeholder="Ej: Athlon 24" />
             </div>
           </div>
 

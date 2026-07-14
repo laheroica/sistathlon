@@ -15,7 +15,7 @@ const HOY = new Date().toISOString().slice(0, 10)   // 'YYYY-MM-DD'
 
 export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onSaved }) {
   const { labelMap: apiLabelMap, colorMap: apiColorMap } = useDisciplinas()
-  const { brandingPDF } = useNegocio()
+  const { brandingPDF, sede1, sede2 } = useNegocio()
   const DISC_LABEL = { ...DISC_LABEL_FB, ...apiLabelMap }
   const DISC_COLOR = { ...DISC_COLOR_FB, ...apiColorMap }
 
@@ -165,8 +165,8 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
                 <span className="text-dark-text">Clases dadas</span>
                 <span className="text-dark-text">{dadas.length}h</span>
               </div>
-              {d107 > 0 && <div className="flex justify-between"><span className="text-indigo-400">↳ Athlon 107</span><span className="text-indigo-300">{d107}h</span></div>}
-              {d24  > 0 && <div className="flex justify-between"><span className="text-cyan-400">↳ Athlon 24</span><span className="text-cyan-300">{d24}h</span></div>}
+              {d107 > 0 && <div className="flex justify-between"><span className="text-indigo-400">↳ {sede1}</span><span className="text-indigo-300">{d107}h</span></div>}
+              {d24  > 0 && <div className="flex justify-between"><span className="text-cyan-400">↳ {sede2}</span><span className="text-cyan-300">{d24}h</span></div>}
             </div>
 
             {/* Proyectadas */}
@@ -176,8 +176,8 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
                   <span className="text-dark-muted flex items-center gap-1"><Clock size={10}/> A dar</span>
                   <span className="text-dark-muted">{proyectadas.length}h</span>
                 </div>
-                {p107 > 0 && <div className="flex justify-between"><span className="text-indigo-400/60">↳ Athlon 107</span><span className="text-indigo-300/60">{p107}h</span></div>}
-                {p24  > 0 && <div className="flex justify-between"><span className="text-cyan-400/60">↳ Athlon 24</span><span className="text-cyan-300/60">{p24}h</span></div>}
+                {p107 > 0 && <div className="flex justify-between"><span className="text-indigo-400/60">↳ {sede1}</span><span className="text-indigo-300/60">{p107}h</span></div>}
+                {p24  > 0 && <div className="flex justify-between"><span className="text-cyan-400/60">↳ {sede2}</span><span className="text-cyan-300/60">{p24}h</span></div>}
               </div>
             )}
 

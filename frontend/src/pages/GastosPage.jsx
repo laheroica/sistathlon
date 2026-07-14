@@ -11,6 +11,7 @@ import { money } from '../lib/format'
 import { HOY, montoAcumulado } from '../lib/liquidaciones'
 import GastoFijoPanel from '../components/gastos/GastoFijoPanel'
 import GastoExtraPanel from '../components/gastos/GastoExtraPanel'
+import { useNegocio } from '../hooks/useNegocio'
 
 // ── Definición de conceptos ───────────────────────────────────────────────────
 
@@ -57,13 +58,6 @@ const GRUPOS = [
   },
 ]
 
-const SEDES = [
-  { val: '', label: 'Todas' },
-  { val: '107', label: 'Athlon 107' },
-  { val: '24',  label: 'Athlon 24' },
-  { val: 'general', label: 'General' },
-]
-
 // Etiqueta + color del chip de sede
 function sedeBadge(sd) {
   if (sd === '107') return { label: 'A107', cls: 'text-indigo-400 bg-indigo-900/30' }
@@ -79,6 +73,8 @@ function mesLabel(y, m) {
 }
 
 export default function GastosPage() {
+  const { sedeOptions } = useNegocio()
+  const SEDES = [{ val: '', label: 'Todas' }, ...sedeOptions, { val: 'general', label: 'General' }]
   const hoy = new Date()
   const [year,  setYear]  = useState(hoy.getFullYear())
   const [month, setMonth] = useState(hoy.getMonth() + 1)

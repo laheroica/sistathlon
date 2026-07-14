@@ -11,6 +11,7 @@ import clsx from 'clsx'
 import api from '../lib/api'
 import { money } from '../lib/format'
 import { useDisciplinas } from '../hooks/useDisciplinas'
+import { useNegocio } from '../hooks/useNegocio'
 
 // Fallbacks mientras carga la API
 const DISC_LABEL_FB = { CF: 'CrossFit', HF: 'Heavy Func.', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus', FB: 'FullBody' }
@@ -63,6 +64,7 @@ function ProgressBar({ value, max, color }) {
 }
 
 export default function DashboardPage() {
+  const { sede1, sede2 } = useNegocio()
   const { data, isLoading, isError } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api.get('/reportes/dashboard/').then(r => r.data),
@@ -240,8 +242,8 @@ export default function DashboardPage() {
 
           <div className="border-t border-dark-border pt-3 mt-2 grid grid-cols-2 gap-3">
             {[
-              { label: 'Athlon 107', val: por_sede['107'] },
-              { label: 'Athlon 24',  val: por_sede['24'] },
+              { label: sede1, val: por_sede['107'] },
+              { label: sede2, val: por_sede['24'] },
             ].map(({ label, val }) => (
               <div key={label} className="bg-dark-bg rounded-xl px-3 py-2 text-center">
                 <p className="text-lg font-bold text-dark-text">{val}</p>

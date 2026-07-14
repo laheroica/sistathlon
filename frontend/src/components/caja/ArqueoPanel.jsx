@@ -6,11 +6,7 @@ import {
 import clsx from 'clsx'
 import api from '../../lib/api'
 import { money, num } from '../../lib/format'
-
-const SEDES = [
-  { val: '107', label: 'Athlon 107' },
-  { val: '24',  label: 'Athlon 24' },
-]
+import { useNegocio } from '../../hooks/useNegocio'
 
 const DENOMINACIONES = [
   { campo: 'cant_20000', valor: 20000 },
@@ -23,6 +19,7 @@ const DENOMINACIONES = [
 ]
 
 export default function ArqueoPanel({ arqueo, defaultMes, onClose, onSaved }) {
+  const { sedeOptions } = useNegocio()
   const isEdit = Boolean(arqueo)
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
@@ -171,7 +168,7 @@ export default function ArqueoPanel({ arqueo, defaultMes, onClose, onSaved }) {
               <div>
                 <label className="block text-xs text-dark-muted font-medium mb-1.5">Sede</label>
                 <select {...register('sede')} className="input w-full text-sm">
-                  {SEDES.map(s => (
+                  {sedeOptions.map(s => (
                     <option key={s.val} value={s.val}>{s.label}</option>
                   ))}
                 </select>

@@ -2,16 +2,13 @@ import { useState, useEffect } from 'react'
 import { X, Save, Loader2, Split } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../../lib/api'
-
-const SEDES = [
-  { val: '107', label: 'Athlon 107' },
-  { val: '24',  label: 'Athlon 24' },
-  { val: 'general', label: 'General' },
-]
+import { useNegocio } from '../../hooks/useNegocio'
 
 function hoy() { return new Date().toISOString().slice(0, 10) }
 
 export default function GastoFijoPanel({ concepto, gasto, mes, onClose, onSaved }) {
+  const { sedeOptions } = useNegocio()
+  const SEDES = [...sedeOptions, { val: 'general', label: 'General' }]
   const isEdit = Boolean(gasto)
   const [sede,    setSede]    = useState(gasto?.sede    ?? '107')
   const [importe, setImporte] = useState(gasto ? String(parseFloat(gasto.importe)) : '')

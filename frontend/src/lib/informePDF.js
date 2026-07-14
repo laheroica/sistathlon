@@ -56,7 +56,7 @@ function grupoLabel(txt) {
 const SEDE_LABEL = { '107': 'Athlon 107', '24': 'Athlon 24', general: 'General' }
 
 // Segunda página: detalle de ventas de productos
-function paginaVentas(d, label, logoUrl, hoy, nombre = 'Athlon', ciudad = '') {
+function paginaVentas(d, label, logoUrl, hoy, nombre = 'Athlon', ciudad = '', sedeLabels = SEDE_LABEL) {
   const ventas = d.ventas || []
   if (ventas.length === 0) return ''
   const r = d.ventas_resumen || {}
@@ -67,7 +67,7 @@ function paginaVentas(d, label, logoUrl, hoy, nombre = 'Athlon', ciudad = '') {
       : `<span style="display:inline-block;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:700;color:${CO.green};background:#eafaf0;border:1px solid #c7ecd5;">Pagado</span>`
     return `
       <tr style="${i % 2 ? 'background:#fcfdfe;' : ''}">
-        <td style="padding:6px 10px;color:${CO.body};">${SEDE_LABEL[v.sede] || v.sede}</td>
+        <td style="padding:6px 10px;color:${CO.body};">${sedeLabels[v.sede] || v.sede}</td>
         <td style="padding:6px 10px;color:${CO.body};white-space:nowrap;">${v.fecha}</td>
         <td style="padding:6px 10px;color:${CO.ink};font-weight:600;">${v.cliente}</td>
         <td style="padding:6px 10px;color:${CO.body};">${v.producto}${v.cantidad > 1 ? ` <span style="color:${CO.muted};">×${v.cantidad}</span>` : ''}</td>
@@ -127,6 +127,7 @@ export function abrirInformePDF(mesKey, d, branding = {}) {
   const logoUrl = branding.logoUrl || `${window.location.origin}${logoNegroAsset}`
   const nombre  = branding.nombre || 'Athlon'
   const ciudad  = branding.ciudad || ''
+  const sedeLabels = branding.sedeLabels || SEDE_LABEL
   const hoy = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
   const res = d.resultado.total
@@ -294,7 +295,7 @@ export function abrirInformePDF(mesKey, d, branding = {}) {
 
   <div class="foot">${nombre} · Informe de ${label}${ciudad ? ' · ' + ciudad : ''}</div>
 
-  ${paginaVentas(d, label, logoUrl, hoy, nombre, ciudad)}
+  ${paginaVentas(d, label, logoUrl, hoy, nombre, ciudad, sedeLabels)}
 
   <script>window.onload = () => window.print()<\/script>
 </body></html>`

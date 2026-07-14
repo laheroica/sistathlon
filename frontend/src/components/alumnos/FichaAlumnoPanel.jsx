@@ -12,6 +12,7 @@ import api from '../../lib/api'
 import clsx from 'clsx'
 import { money } from '../../lib/format'
 import { useDisciplinas } from '../../hooks/useDisciplinas'
+import { useNegocio } from '../../hooks/useNegocio'
 
 // ─── Fallbacks (por si la API tarda) ──────────────────────────────────────────
 const DISC_LABEL_FB  = { CF: 'CrossFit', HF: 'Heavy Func.', HX: 'Hyrox', TN: 'Teens', KD: 'Kids', BP: 'Bonus', FB: 'FullBody' }
@@ -122,6 +123,7 @@ function ChipSelector({ options, value, onChange, renderLabel, className = '' })
 // ─── Componente principal ──────────────────────────────────────────────────────
 export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) {
   const qc   = useQueryClient()
+  const { sedeOptions, sedeLabel } = useNegocio()
   const meses = mesOptions()
 
   // Disciplinas dinámicas
@@ -258,7 +260,7 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
       open={open}
       onClose={onClose}
       title={alumno.nombre_completo}
-      subtitle={`Sede ${alumno.sede === '107' ? 'Athlon 107' : alumno.sede === '24' ? 'Athlon 24' : alumno.sede}`}
+      subtitle={`Sede ${sedeLabel(alumno.sede)}`}
     >
       <form onSubmit={handleSubmit(d => pagoMutation.mutate(d))} className="space-y-5">
 
@@ -300,10 +302,7 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
           <div>
             <p className="text-xs text-dark-muted mb-1.5">Sede</p>
             <ChipSelector
-              options={[
-                { value: '107', label: 'Athlon 107' },
-                { value: '24',  label: 'Athlon 24' },
-              ]}
+              options={sedeOptions.map(s => ({ value: s.val, label: s.label }))}
               value={alumno.sede}
               onChange={(v) => setPend('sede', v)}
             />

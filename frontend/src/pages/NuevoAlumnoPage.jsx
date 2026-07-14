@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { money } from '../lib/format'
 import RegistrarPagoPanel from '../components/pagos/RegistrarPagoPanel'
 import { useDisciplinas } from '../hooks/useDisciplinas'
+import { useNegocio } from '../hooks/useNegocio'
 
 const PASOS = ['Datos personales', 'Actividad y cuota', 'Confirmar']
 
@@ -30,6 +31,7 @@ export default function NuevoAlumnoPage() {
   const navigate = useNavigate()
   // Disciplinas dinámicas (solo activas)
   const { discs } = useDisciplinas({ soloActivas: true })
+  const { sedeOptions, sedeLabel } = useNegocio()
   const DISCIPLINAS = discs.map(d => ({ value: d.codigo, label: d.nombre }))
   const FRECUENCIAS = Object.fromEntries(discs.map(d => [d.codigo, frecToOpts(d.frecuencias)]))
   const [paso, setPaso] = useState(0)
@@ -191,8 +193,7 @@ export default function NuevoAlumnoPage() {
                 <label className="block text-xs text-dark-muted mb-1">Sede *</label>
                 <select className="input" value={form.sede} onChange={(e) => set('sede', e.target.value)} required>
                   <option value="">Seleccionar...</option>
-                  <option value="107">Athlon 107</option>
-                  <option value="24">Athlon 24</option>
+                  {sedeOptions.map(s => <option key={s.val} value={s.val}>{s.label}</option>)}
                 </select>
               </div>
               <div>
@@ -425,7 +426,7 @@ export default function NuevoAlumnoPage() {
               ['Celular', form.celular],
               ['Email', form.email || '—'],
               ['Instagram', form.instagram || '—'],
-              ['Sede', form.sede === '107' ? 'Athlon 107' : 'Athlon 24'],
+              ['Sede', sedeLabel(form.sede)],
               ['Fecha inicio', form.fecha_inicio],
               ['Disciplina', form.disciplina],
               ['Frecuencia', form.frecuencia],
