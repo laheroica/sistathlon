@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Settings, Save, Loader2, Upload, Building2, Plus } from 'lucide-react'
+import { Settings, Save, Loader2, Upload, Building2, Plus, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import api from '../lib/api'
 
@@ -66,7 +66,7 @@ function LogoField({ label, hint, fondo, value, onChange }) {
 
 // ── ABM de sedes / sucursales ──────────────────────────────────────────────────
 
-function SedeRow({ sede }) {
+function SedeRow({ sede, onError }) {
   const qc = useQueryClient()
   const [nombre, setNombre] = useState(sede.nombre)
   useEffect(() => { setNombre(sede.nombre) }, [sede.nombre])
@@ -79,8 +79,20 @@ function SedeRow({ sede }) {
     refetch()
   }
   async function toggleActiva() {
+    onError('')
     await api.patch(`/config/sedes/${sede.id}/`, { activa: !sede.activa })
     refetch()
+  }
+  async function eliminar() {
+    onError('')
+    if (!window.confirm(`¿Eliminar la sede "${sede.nombre}"? Esta acción no se puede deshacer.`)) return
+    try {
+      await api.delete(`/config/sedes/${sede.id}/`)
+      refetch()
+    } catch (e) {
+      onError(e.response?.data?.detail
+        || (e.response?.status === 403 ? 'Solo el superadministrador puede eliminar sedes.' : 'Error al eliminar la sede.'))
+    }
   }
 
   return (
@@ -100,6 +112,10 @@ function SedeRow({ sede }) {
             : 'border-green-800/40 text-green-400 hover:text-green-300')}>
         {sede.activa ? 'Desactivar' : 'Activar'}
       </button>
+      <button type="button" onClick={eliminar} title="Eliminar sede (solo si no tiene datos)"
+        className="text-dark-muted hover:text-red-400 transition-colors flex-shrink-0 p-1.5">
+        <Trash2 size={15} />
+      </button>
     </div>
   )
 }
@@ -112,6 +128,10 @@ function SedesManager() {
   })
   const [nuevo, setNuevo] = useState({ codigo: '', nombre: '' })
   const [err, setErr] = useState('')
+  const [verInactivas, setVerInactivas] = useState(false)
+
+  const activas   = sedes.filter(s => s.activa)
+  const inactivas = sedes.filter(s => !s.activa)
 
   async function agregar() {
     setErr('')
@@ -138,7 +158,15 @@ function SedesManager() {
         <div className="h-16 bg-dark-bg rounded-xl animate-pulse" />
       ) : (
         <div className="space-y-2">
-          {sedes.map(s => <SedeRow key={s.id} sede={s} />)}
+          {activas.map(s => <SedeRow key={s.id} sede={s} onError={setErr} />)}
+
+          {inactivas.length > 0 && (
+            <button type="button" onClick={() => setVerInactivas(v => !v)}
+              className="text-xs text-dark-muted hover:text-dark-text transition-colors">
+              {verInactivas ? 'Ocultar' : 'Ver'} inactivas ({inactivas.length})
+            </button>
+          )}
+          {verInactivas && inactivas.map(s => <SedeRow key={s.id} sede={s} onError={setErr} />)}
         </div>
       )}
 

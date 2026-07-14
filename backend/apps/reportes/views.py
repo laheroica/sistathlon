@@ -243,9 +243,9 @@ def anual(request):
         .annotate(cant=Count('id'), total=Sum('monto'))
     )
 
-    # ── Sedes activas (dinámico) ──────────────────────────────────────────────
+    # ── Sedes (todas, activas o no: una sede cerrada conserva su historial) ────
     codes = list(
-        Sede.objects.filter(activa=True).order_by('orden', 'codigo')
+        Sede.objects.order_by('orden', 'codigo')
         .values_list('codigo', flat=True)
     )
     all_buckets = codes + ['general']
@@ -458,7 +458,7 @@ def mes_detalle(request):
 
     from apps.alumnos.models import Sede
     _codes = list(
-        Sede.objects.filter(activa=True).order_by('orden', 'codigo')
+        Sede.objects.order_by('orden', 'codigo')
         .values_list('codigo', flat=True)
     )
 

@@ -45,6 +45,38 @@ class SedeDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [SadminOrReadOnly]
     queryset           = Sede.objects.all()
 
+    def destroy(self, request, *args, **kwargs):
+        """Solo se puede eliminar una sede sin datos. Si tiene registros
+        asociados, se bloquea y se sugiere desactivarla (para no perder su
+        historial en los reportes)."""
+        sede = self.get_object()
+        cod = sede.codigo
+
+        from apps.profes.models import Profe
+        from apps.caja.models import GastoFijo, GastoExtra, ArqueoCaja
+        from apps.productos.models import Venta
+        from apps.temporales.models import AlumnoTemporal
+        from apps.horarios.models import HorarioMaestro, HorarioReal
+
+        usos = (
+            Alumno.objects.filter(sede=cod).count()
+            + Profe.objects.filter(sede=cod).count()
+            + GastoFijo.objects.filter(sede=cod).count()
+            + GastoExtra.objects.filter(sede=cod).count()
+            + ArqueoCaja.objects.filter(sede=cod).count()
+            + Venta.objects.filter(sede=cod).count()
+            + AlumnoTemporal.objects.filter(sede=cod).count()
+            + HorarioMaestro.objects.filter(sede=cod).count()
+            + HorarioReal.objects.filter(sede=cod).count()
+        )
+        if usos:
+            return Response(
+                {'detail': f'No se puede eliminar: la sede tiene {usos} registro(s) '
+                           f'asociado(s). Desactivala para conservar su historial.'},
+                status=409,
+            )
+        return super().destroy(request, *args, **kwargs)
+
 
 # ── Disciplinas (ABM dinámico) ─────────────────────────────────────────────────
 
