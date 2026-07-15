@@ -10,8 +10,6 @@ import { useNegocio } from '../hooks/useNegocio'
 const TIPO_LABEL = { hora: 'Por hora', porcentaje: '% recaudación', fijo: 'Sueldo fijo', mixto: 'Horas + %' }
 
 export default function ProfesPage() {
-  const { sedeLabels } = useNegocio()
-  const SEDE_LABEL = { ...sedeLabels, ambas: 'Ambas sedes' }
   const [soloActivos, setSoloActivos] = useState(true)
   const [panel, setPanel] = useState(null)
   const qc = useQueryClient()
@@ -116,6 +114,8 @@ export default function ProfesPage() {
 
 // ── Card de profe ─────────────────────────────────────────────────────────────
 function ProfeCard({ profe: p, onEdit, onDelete, onToggle }) {
+  const { sedeLabels } = useNegocio()
+  const sedeLabel = p.sede === 'ambas' ? 'Ambas sedes' : (sedeLabels[p.sede] || p.sede)
   const vh = p.valor_mes_actual
 
   function tarifaLabel() {
@@ -140,7 +140,7 @@ function ProfeCard({ profe: p, onEdit, onDelete, onToggle }) {
           </div>
           <div>
             <p className="font-bold text-dark-text">{p.nombre}</p>
-            <p className="text-xs text-dark-muted">{SEDE_LABEL[p.sede]}</p>
+            <p className="text-xs text-dark-muted">{sedeLabel}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
