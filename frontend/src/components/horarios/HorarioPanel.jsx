@@ -61,7 +61,7 @@ export default function HorarioPanel({ horario, defaultDia, defaultSede, profes,
       capacidad_max: horario.capacidad_max,
       activo:        horario.activo,
     } : {
-      sede:          defaultSede ?? '107',
+      sede:          defaultSede ?? SEDES[0]?.val ?? '107',
       dia:           defaultDia  ?? 'lun',
       hora:          '07:00',
       disciplina:    'CF',

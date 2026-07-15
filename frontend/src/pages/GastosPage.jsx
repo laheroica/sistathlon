@@ -58,12 +58,7 @@ const GRUPOS = [
   },
 ]
 
-// Etiqueta + color del chip de sede
-function sedeBadge(sd) {
-  if (sd === '107') return { label: 'A107', cls: 'text-indigo-400 bg-indigo-900/30' }
-  if (sd === '24')  return { label: 'A24',  cls: 'text-cyan-400 bg-cyan-900/30' }
-  return { label: 'Gral', cls: 'text-amber-400 bg-amber-900/30' }
-}
+const GENERAL_COLOR = '#f59e0b'
 
 function mesStr(y, m) { return `${y}-${String(m).padStart(2, '0')}` }
 function mesLabel(y, m) {
@@ -73,8 +68,16 @@ function mesLabel(y, m) {
 }
 
 export default function GastosPage() {
-  const { sedeOptions } = useNegocio()
+  const { sedeOptions, sedeColor } = useNegocio()
   const SEDES = [{ val: '', label: 'Todas' }, ...sedeOptions, { val: 'general', label: 'General' }]
+  const codes = sedeOptions.map(o => o.val)
+  // Columnas de la vista por sede: cada sucursal + General
+  const cols  = [...sedeOptions.map(o => ({ val: o.val, label: o.val, color: o.color })),
+                 { val: 'general', label: 'Gral', color: GENERAL_COLOR }]
+  // Etiqueta + color del chip de sede (dinámico)
+  const sedeBadge = (sd) => sd === 'general'
+    ? { label: 'Gral', color: GENERAL_COLOR }
+    : { label: sd, color: sedeColor(sd) }
   const hoy = new Date()
   const [year,  setYear]  = useState(hoy.getFullYear())
   const [month, setMonth] = useState(hoy.getMonth() + 1)
@@ -127,32 +130,23 @@ export default function GastosPage() {
   const sumImporte = (arr, sd) => arr.filter(g => g.sede === sd).reduce((s, g) => s + parseFloat(g.importe), 0)
   const sumTotal   = (arr, sd) => arr.filter(g => g.sede === sd).reduce((s, g) => s + g.total, 0)
 
-  // Total fijos por sede (cada compartido contribuye su mitad a cada una)
-  const total107      = useMemo(() => sumImporte(fijos, '107'),     [fijos])
-  const total24       = useMemo(() => sumImporte(fijos, '24'),      [fijos])
-  const totalGeneral  = useMemo(() => sumImporte(fijos, 'general'), [fijos])
-
-  const extras107     = useMemo(() => sumTotal(extrasAll, '107'),     [extrasAll])
-  const extras24      = useMemo(() => sumTotal(extrasAll, '24'),      [extrasAll])
-  const extrasGeneral = useMemo(() => sumTotal(extrasAll, 'general'), [extrasAll])
+  // Totales por sede (cada compartido contribuye su parte a cada una).
+  // fijosPorSede/extrasPorSede/profesPorSede: {codigoSede|'general': monto}
+  const fijosPorSede  = useMemo(() => Object.fromEntries(cols.map(c => [c.val, sumImporte(fijos, c.val)])),     [fijos, cols])
+  const extrasPorSede = useMemo(() => Object.fromEntries(cols.map(c => [c.val, sumTotal(extrasAll, c.val)])),   [extrasAll, cols])
+  const profesPorSede = useMemo(() => Object.fromEntries(cols.map(c => [c.val, todosProfes.reduce((s, p) => s + montoAcumulado(p, c.val, codes), 0)])), [todosProfes, cols, codes])
   const totalExtras   = extras.reduce((s, g) => s + g.total, 0)   // suma de los visibles (respeta filtro)
 
-  // Acumulado hasta hoy pagado/a pagar a los profes, por sede
-  const profes107     = useMemo(() => todosProfes.reduce((s, p) => s + montoAcumulado(p, '107'),     0), [todosProfes])
-  const profes24      = useMemo(() => todosProfes.reduce((s, p) => s + montoAcumulado(p, '24'),      0), [todosProfes])
-  const profesGeneral = useMemo(() => todosProfes.reduce((s, p) => s + montoAcumulado(p, 'general'), 0), [todosProfes])
-  const totalProfes   = profes107 + profes24 + profesGeneral
-  const totalProfesFiltrado = sede
-    ? (sede === '107' ? profes107 : sede === '24' ? profes24 : profesGeneral)
-    : totalProfes
+  const totalProfes         = cols.reduce((s, c) => s + profesPorSede[c.val], 0)
+  const totalProfesFiltrado = sede ? (profesPorSede[sede] || 0) : totalProfes
   const profesConHoras = useMemo(
     () => todosProfes
       .filter(p =>
         (p.clases ?? []).some(c => c.fecha <= HOY && (!sede || c.sede === sede)) ||
-        montoAcumulado(p, sede) > 0   // fijos/mixtos sin clases (ej. sueldo del dueño)
+        montoAcumulado(p, sede, codes) > 0   // fijos/mixtos sin clases (ej. sueldo del dueño)
       )
       .sort((a, b) => a.profe_nombre.localeCompare(b.profe_nombre)),
-    [todosProfes, sede]
+    [todosProfes, sede, codes]
   )
 
   // ── Delete helpers ────────────────────────────────────────────────────────────
@@ -219,39 +213,36 @@ export default function GastosPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-[1fr_repeat(3,minmax(64px,90px))] gap-x-2 sm:gap-x-3 gap-y-1.5 items-center overflow-x-auto">
+      <div className="grid gap-x-2 sm:gap-x-3 gap-y-1.5 items-center overflow-x-auto"
+        style={{ gridTemplateColumns: `1fr repeat(${cols.length}, minmax(64px,90px))` }}>
         {/* Headers */}
         <div/>
-        <p className="text-xs font-semibold text-indigo-400 text-right">A107</p>
-        <p className="text-xs font-semibold text-cyan-400 text-right">A24</p>
-        <p className="text-xs font-semibold text-amber-400 text-right">Gral</p>
+        {cols.map(c => (
+          <p key={c.val} className="text-xs font-semibold text-right" style={{ color: c.color }}>{c.label}</p>
+        ))}
 
         {/* Fijos */}
         <p className="text-xs text-dark-muted">Gastos fijos</p>
-        <p className="text-sm font-bold text-red-400 text-right">{money(total107)}</p>
-        <p className="text-sm font-bold text-red-400 text-right">{money(total24)}</p>
-        <p className="text-sm font-bold text-red-400 text-right">{money(totalGeneral)}</p>
+        {cols.map(c => <p key={c.val} className="text-sm font-bold text-red-400 text-right">{money(fijosPorSede[c.val])}</p>)}
 
         {/* Extras */}
         <p className="text-xs text-dark-muted">Gastos extras</p>
-        <p className="text-sm font-bold text-orange-400 text-right">{money(extras107)}</p>
-        <p className="text-sm font-bold text-orange-400 text-right">{money(extras24)}</p>
-        <p className="text-sm font-bold text-orange-400 text-right">{money(extrasGeneral)}</p>
+        {cols.map(c => <p key={c.val} className="text-sm font-bold text-orange-400 text-right">{money(extrasPorSede[c.val])}</p>)}
 
         {/* Profes */}
         <p className="text-xs text-dark-muted">Profes</p>
-        <p className="text-sm font-bold text-purple-400 text-right">{money(profes107)}</p>
-        <p className="text-sm font-bold text-purple-400 text-right">{money(profes24)}</p>
-        <p className="text-sm font-bold text-purple-400 text-right">{money(profesGeneral)}</p>
+        {cols.map(c => <p key={c.val} className="text-sm font-bold text-purple-400 text-right">{money(profesPorSede[c.val])}</p>)}
 
         {/* Separador */}
-        <div className="col-span-4 border-t border-dark-border my-0.5"/>
+        <div className="border-t border-dark-border my-0.5" style={{ gridColumn: '1 / -1' }}/>
 
         {/* Total */}
         <p className="text-xs font-semibold text-dark-text">Total egresos</p>
-        <p className="text-base font-bold text-dark-text text-right">{money(total107 + extras107 + profes107)}</p>
-        <p className="text-base font-bold text-dark-text text-right">{money(total24  + extras24  + profes24)}</p>
-        <p className="text-base font-bold text-dark-text text-right">{money(totalGeneral + extrasGeneral + profesGeneral)}</p>
+        {cols.map(c => (
+          <p key={c.val} className="text-base font-bold text-dark-text text-right">
+            {money(fijosPorSede[c.val] + extrasPorSede[c.val] + profesPorSede[c.val])}
+          </p>
+        ))}
       </div>
 
       {/* ── Gastos Fijos ────────────────────────────────────────────────────── */}
@@ -317,7 +308,8 @@ export default function GastosPage() {
                   <span className="text-dark-muted text-right">×{parseFloat(ex.cantidad)}</span>
                   <span className="text-orange-400 font-semibold text-right">{money(ex.total)}</span>
                   <span className="text-center">
-                    <span className={clsx('text-xs px-1.5 py-0.5 rounded font-medium', sedeBadge(ex.sede).cls)}>
+                    <span className="text-xs px-1.5 py-0.5 rounded font-medium"
+                      style={{ color: sedeBadge(ex.sede).color, backgroundColor: sedeBadge(ex.sede).color + '22' }}>
                       {sedeBadge(ex.sede).label}
                     </span>
                   </span>
@@ -362,12 +354,10 @@ export default function GastosPage() {
         ) : (
           <div className="divide-y divide-dark-border">
             {profesConHoras.map(p => {
-              const p107 = montoAcumulado(p, '107')
-              const p24  = montoAcumulado(p, '24')
-              const pGen = montoAcumulado(p, 'general')
+              const montos = cols.map(c => ({ ...c, monto: montoAcumulado(p, c.val, codes) }))
               const totalFila = sede
-                ? (sede === '107' ? p107 : sede === '24' ? p24 : pGen)
-                : p107 + p24 + pGen
+                ? montoAcumulado(p, sede, codes)
+                : montos.reduce((s, m) => s + m.monto, 0)
               return (
                 <div key={p.profe_id} className="flex items-center gap-3 px-5 py-3">
                   <div
@@ -377,24 +367,12 @@ export default function GastosPage() {
                     {p.profe_nombre.slice(0, 2).toUpperCase()}
                   </div>
                   <span className="flex-1 text-sm text-dark-text font-medium truncate">{p.profe_nombre}</span>
-                  {(!sede || sede === '107') && p107 > 0 && (
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="text-indigo-400 font-semibold">A107</span>
-                      <span className="text-indigo-400 font-bold">{money(p107)}</span>
+                  {montos.filter(m => (!sede || sede === m.val) && m.monto > 0).map(m => (
+                    <div key={m.val} className="flex items-center gap-1.5 text-xs" style={{ color: m.color }}>
+                      <span className="font-semibold">{m.label}</span>
+                      <span className="font-bold">{money(m.monto)}</span>
                     </div>
-                  )}
-                  {(!sede || sede === '24') && p24 > 0 && (
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="text-cyan-400 font-semibold">A24</span>
-                      <span className="text-cyan-400 font-bold">{money(p24)}</span>
-                    </div>
-                  )}
-                  {(!sede || sede === 'general') && pGen > 0 && (
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="text-amber-400 font-semibold">Gral</span>
-                      <span className="text-amber-400 font-bold">{money(pGen)}</span>
-                    </div>
-                  )}
+                  ))}
                   <span className="text-sm font-bold text-purple-400 w-24 text-right">{money(totalFila)}</span>
                 </div>
               )
@@ -507,7 +485,8 @@ function GrupoFijos({ grupo, fijos, sede, mes, onAdd, onEdit, onDelete }) {
                     {visibles.map(g => (
                       <div key={g.id} className="flex items-center gap-2 text-xs text-dark-muted group">
                         <span className="text-dark-muted">{g.fecha}</span>
-                        <span className={clsx('px-1.5 py-0.5 rounded text-xs font-medium', sedeBadge(g.sede).cls)}>
+                        <span className="px-1.5 py-0.5 rounded text-xs font-medium"
+                          style={{ color: sedeBadge(g.sede).color, backgroundColor: sedeBadge(g.sede).color + '22' }}>
                           {sedeBadge(g.sede).label}
                         </span>
                         <span className="font-semibold text-dark-text">{money(g.importe)}</span>

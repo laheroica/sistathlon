@@ -12,7 +12,7 @@ export default function GastoExtraPanel({ extra, mes, onClose, onSaved }) {
   const SEDES = [...sedeOptions, { val: 'general', label: 'General' }]
   const isEdit = Boolean(extra)
 
-  const [sede,     setSede]     = useState(extra?.sede     ?? '107')
+  const [sede,     setSede]     = useState(extra?.sede     ?? (sedeOptions[0]?.val || '107'))
   const [concepto, setConcepto] = useState(extra?.concepto ?? '')
   const [precioU,  setPrecioU]  = useState(extra?.precio_unitario ?? '')
   const [cantidad, setCantidad] = useState(extra?.cantidad  ?? 1)

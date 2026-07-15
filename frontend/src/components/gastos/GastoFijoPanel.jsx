@@ -10,7 +10,7 @@ export default function GastoFijoPanel({ concepto, gasto, mes, onClose, onSaved 
   const { sedeOptions } = useNegocio()
   const SEDES = [...sedeOptions, { val: 'general', label: 'General' }]
   const isEdit = Boolean(gasto)
-  const [sede,    setSede]    = useState(gasto?.sede    ?? '107')
+  const [sede,    setSede]    = useState(gasto?.sede    ?? (sedeOptions[0]?.val || '107'))
   const [importe, setImporte] = useState(gasto ? String(parseFloat(gasto.importe)) : '')
   const [fecha,   setFecha]   = useState(gasto?.fecha   ?? hoy())
   const [notas,   setNotas]   = useState(gasto?.notas   ?? '')
@@ -79,7 +79,7 @@ export default function GastoFijoPanel({ concepto, gasto, mes, onClose, onSaved 
             <div className="flex items-start gap-2 bg-amber-900/20 border border-amber-800/30 rounded-xl px-4 py-3">
               <Split size={14} className="text-amber-400 mt-0.5 flex-shrink-0"/>
               <p className="text-xs text-amber-300">
-                El importe ingresado se divide en dos: <strong>mitad para A107</strong> y <strong>mitad para A24</strong>.
+                El importe ingresado se divide en <strong>partes iguales entre las sucursales</strong>.
               </p>
             </div>
           )}

@@ -55,7 +55,7 @@ export default function TemporalPanel({ temporal, onClose, onSaved }) {
       notas:       temporal.notas || '',
     } : {
       nombre: '', dni: '', celular: '',
-      sede: '107', disciplina: 'CF', tipo: 'semana',
+      sede: sedeOptions[0]?.val || '107', disciplina: 'CF', tipo: 'semana',
       fecha_inicio: hoy, fecha_fin: '',
       monto: '', pagado: false, notas: '',
     }

@@ -23,13 +23,13 @@ function Monto({ v, className }) {
   )
 }
 
-// Fila de 4 valores (107 / 24 / general / total)
+// Fila con una columna por sede + General + Total (columnas dinámicas)
 function Fila({ label, b, bold, indent, color }) {
+  const { sedeOptions } = useNegocio()
   return (
     <tr className={clsx(bold && 'font-semibold')}>
       <td className={clsx('py-1.5 px-2 text-dark-text', indent && 'pl-5')}>{label}</td>
-      <Monto v={b['107']} className={color} />
-      <Monto v={b['24']} className={color} />
+      {sedeOptions.map(o => <Monto key={o.val} v={b[o.val]} className={color} />)}
       <Monto v={b.general} className={color} />
       <Monto v={b.total} className={clsx('font-bold', color)} />
     </tr>
@@ -37,7 +37,9 @@ function Fila({ label, b, bold, indent, color }) {
 }
 
 export default function MesDetallePanel({ mesKey, onClose }) {
-  const { brandingPDF } = useNegocio()
+  const { brandingPDF, sedeOptions } = useNegocio()
+  const codes = sedeOptions.map(o => o.val)
+  const cs = codes.length + 3   // colSpan: Concepto + sedes + General + Total
   const { data, isLoading, isError } = useQuery({
     queryKey: ['mes-detalle', mesKey],
     queryFn: () => api.get('/reportes/mes-detalle/', { params: { mes: mesKey } }).then(r => r.data),
@@ -82,8 +84,9 @@ export default function MesDetallePanel({ mesKey, onClose }) {
               <thead className="sticky top-0 bg-dark-surface">
                 <tr className="text-xs text-dark-muted border-b border-dark-border">
                   <th className="text-left font-medium py-2 px-2">Concepto</th>
-                  <th className="text-right font-medium py-2 px-2 text-indigo-400">A107</th>
-                  <th className="text-right font-medium py-2 px-2 text-cyan-400">A24</th>
+                  {sedeOptions.map(o => (
+                    <th key={o.val} className="text-right font-medium py-2 px-2" style={{ color: o.color }}>{o.val}</th>
+                  ))}
                   <th className="text-right font-medium py-2 px-2 text-amber-400">Gral</th>
                   <th className="text-right font-medium py-2 px-2">Total</th>
                 </tr>
@@ -91,7 +94,7 @@ export default function MesDetallePanel({ mesKey, onClose }) {
               <tbody>
                 {/* INGRESOS */}
                 <tr className="bg-dark-bg/50">
-                  <td colSpan={5} className="py-1.5 px-2 text-xs font-semibold text-green-400 uppercase tracking-wider">Ingresos</td>
+                  <td colSpan={cs} className="py-1.5 px-2 text-xs font-semibold text-green-400 uppercase tracking-wider">Ingresos</td>
                 </tr>
                 <Fila label="Cuotas cobradas" b={data.ingresos.cuotas} color="text-green-400" />
                 <Fila label="Productos" b={data.ingresos.productos} color="text-green-400" />
@@ -99,42 +102,41 @@ export default function MesDetallePanel({ mesKey, onClose }) {
 
                 {/* EGRESOS */}
                 <tr className="bg-dark-bg/50">
-                  <td colSpan={5} className="py-1.5 px-2 pt-3 text-xs font-semibold text-red-400 uppercase tracking-wider">Egresos</td>
+                  <td colSpan={cs} className="py-1.5 px-2 pt-3 text-xs font-semibold text-red-400 uppercase tracking-wider">Egresos</td>
                 </tr>
 
                 {/* Profes */}
-                <tr><td colSpan={5} className="pt-2 px-2 text-xs text-dark-muted">Profes</td></tr>
+                <tr><td colSpan={cs} className="pt-2 px-2 text-xs text-dark-muted">Profes</td></tr>
                 {data.profes.map((p, i) => <Fila key={'p' + i} label={p.nombre} b={p} indent />)}
                 {data.profes.length === 0 && (
-                  <tr><td colSpan={5} className="pl-5 px-2 py-1 text-xs text-dark-border">Sin liquidaciones confirmadas</td></tr>
+                  <tr><td colSpan={cs} className="pl-5 px-2 py-1 text-xs text-dark-border">Sin liquidaciones confirmadas</td></tr>
                 )}
                 <Fila label="Subtotal profes" b={data.totales.profes} bold color="text-purple-400" />
 
                 {/* Gastos fijos */}
-                <tr><td colSpan={5} className="pt-2 px-2 text-xs text-dark-muted">Gastos fijos</td></tr>
+                <tr><td colSpan={cs} className="pt-2 px-2 text-xs text-dark-muted">Gastos fijos</td></tr>
                 {data.fijos.map((f, i) => <Fila key={'f' + i} label={f.label} b={f} indent />)}
                 {data.fijos.length === 0 && (
-                  <tr><td colSpan={5} className="pl-5 px-2 py-1 text-xs text-dark-border">Sin gastos fijos</td></tr>
+                  <tr><td colSpan={cs} className="pl-5 px-2 py-1 text-xs text-dark-border">Sin gastos fijos</td></tr>
                 )}
                 <Fila label="Subtotal fijos" b={data.totales.fijos} bold color="text-red-400" />
 
                 {/* Gastos extras */}
-                <tr><td colSpan={5} className="pt-2 px-2 text-xs text-dark-muted">Gastos extras</td></tr>
+                <tr><td colSpan={cs} className="pt-2 px-2 text-xs text-dark-muted">Gastos extras</td></tr>
                 {data.extras.map((e, i) => {
-                  const b = { '107': 0, '24': 0, general: 0, total: e.importe }
+                  const b = { general: 0, total: e.importe }; codes.forEach(c => { b[c] = 0 })
                   b[e.sede] = e.importe
                   return <Fila key={'e' + i} label={e.concepto} b={b} indent />
                 })}
                 {data.extras.length === 0 && (
-                  <tr><td colSpan={5} className="pl-5 px-2 py-1 text-xs text-dark-border">Sin gastos extras</td></tr>
+                  <tr><td colSpan={cs} className="pl-5 px-2 py-1 text-xs text-dark-border">Sin gastos extras</td></tr>
                 )}
                 <Fila label="Subtotal extras" b={data.totales.extras} bold color="text-orange-400" />
 
                 {/* Total egresos */}
                 <tr className="border-t border-dark-border">
                   <td className="py-2 px-2 font-bold text-dark-text">Total egresos</td>
-                  <Monto v={data.totales.egresos['107']} className="font-bold text-red-400" />
-                  <Monto v={data.totales.egresos['24']} className="font-bold text-red-400" />
+                  {codes.map(c => <Monto key={c} v={data.totales.egresos[c]} className="font-bold text-red-400" />)}
                   <Monto v={data.totales.egresos.general} className="font-bold text-red-400" />
                   <Monto v={data.totales.egresos.total} className="font-bold text-red-400" />
                 </tr>
@@ -142,7 +144,7 @@ export default function MesDetallePanel({ mesKey, onClose }) {
                 {/* RESULTADO */}
                 <tr className="border-t-2 border-dark-border">
                   <td className="py-2.5 px-2 font-bold text-dark-text uppercase text-xs tracking-wider">Resultado del mes</td>
-                  {['107', '24', 'general', 'total'].map(k => (
+                  {[...codes, 'general', 'total'].map(k => (
                     <td key={k} className={clsx(
                       'py-2.5 px-2 text-right tabular-nums font-bold whitespace-nowrap',
                       data.resultado[k] >= 0 ? 'text-emerald-400' : 'text-red-400'

@@ -15,7 +15,7 @@ const HOY = new Date().toISOString().slice(0, 10)   // 'YYYY-MM-DD'
 
 export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onSaved }) {
   const { labelMap: apiLabelMap, colorMap: apiColorMap } = useDisciplinas()
-  const { brandingPDF, sede1, sede2 } = useNegocio()
+  const { brandingPDF, sedeOptions } = useNegocio()
   const DISC_LABEL = { ...DISC_LABEL_FB, ...apiLabelMap }
   const DISC_COLOR = { ...DISC_COLOR_FB, ...apiColorMap }
 
@@ -37,11 +37,9 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
 
   const montoNum = parseFloat(String(montoFinal).replace(/\./g, '').replace(',', '.')) || 0
 
-  // Desglose sedes — solo dadas
-  const d107 = dadas.filter(c => c.sede === '107').length
-  const d24  = dadas.filter(c => c.sede === '24').length
-  const p107 = proyectadas.filter(c => c.sede === '107').length
-  const p24  = proyectadas.filter(c => c.sede === '24').length
+  // Desglose por sede (dinámico) — dadas y proyectadas
+  const dadasPorSede = sedeOptions.map(o => ({ ...o, horas: dadas.filter(c => c.sede === o.val).length }))
+  const proyPorSede  = sedeOptions.map(o => ({ ...o, horas: proyectadas.filter(c => c.sede === o.val).length }))
 
   // Agrupar por fecha
   function agruparPorFecha(lista) {
@@ -165,8 +163,9 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
                 <span className="text-dark-text">Clases dadas</span>
                 <span className="text-dark-text">{dadas.length}h</span>
               </div>
-              {d107 > 0 && <div className="flex justify-between"><span className="text-indigo-400">↳ {sede1}</span><span className="text-indigo-300">{d107}h</span></div>}
-              {d24  > 0 && <div className="flex justify-between"><span className="text-cyan-400">↳ {sede2}</span><span className="text-cyan-300">{d24}h</span></div>}
+              {dadasPorSede.filter(x => x.horas > 0).map(x => (
+                <div key={x.val} className="flex justify-between"><span style={{ color: x.color }}>↳ {x.label}</span><span style={{ color: x.color }}>{x.horas}h</span></div>
+              ))}
             </div>
 
             {/* Proyectadas */}
@@ -176,8 +175,9 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
                   <span className="text-dark-muted flex items-center gap-1"><Clock size={10}/> A dar</span>
                   <span className="text-dark-muted">{proyectadas.length}h</span>
                 </div>
-                {p107 > 0 && <div className="flex justify-between"><span className="text-indigo-400/60">↳ {sede1}</span><span className="text-indigo-300/60">{p107}h</span></div>}
-                {p24  > 0 && <div className="flex justify-between"><span className="text-cyan-400/60">↳ {sede2}</span><span className="text-cyan-300/60">{p24}h</span></div>}
+                {proyPorSede.filter(x => x.horas > 0).map(x => (
+                  <div key={x.val} className="flex justify-between opacity-60"><span style={{ color: x.color }}>↳ {x.label}</span><span style={{ color: x.color }}>{x.horas}h</span></div>
+                ))}
               </div>
             )}
 
@@ -322,6 +322,7 @@ export default function LiquidacionPanel({ profe: p, mes, mesLabel, onClose, onS
 
 // ── Lista de clases agrupadas por fecha ───────────────────────────────────────
 function ClasesList({ titulo, porFecha, fechas, proyectada, discLabel, discColor }) {
+  const { sedeOptions, sedeColor } = useNegocio()
   return (
     <div className={clsx(proyectada && 'opacity-50')}>
       <p className={clsx(
@@ -335,8 +336,9 @@ function ClasesList({ titulo, porFecha, fechas, proyectada, discLabel, discColor
         {fechas.map(fecha => {
           const [y, m, d] = fecha.split('-')
           const clasesDelDia = porFecha[fecha]
-          const h107dia = clasesDelDia.filter(c => c.sede === '107').length
-          const h24dia  = clasesDelDia.filter(c => c.sede === '24').length
+          const porSedeDia = sedeOptions
+            .map(o => ({ val: o.val, horas: clasesDelDia.filter(c => c.sede === o.val).length }))
+            .filter(x => x.horas > 0)
           return (
             <div key={fecha}>
               <div className="flex items-center gap-2 mb-1">
@@ -345,9 +347,9 @@ function ClasesList({ titulo, porFecha, fechas, proyectada, discLabel, discColor
                 </p>
                 <span className="text-xs text-dark-muted">
                   ({clasesDelDia.length}h
-                  {h107dia > 0 && h24dia > 0
-                    ? ` — ${h107dia}h A107 · ${h24dia}h A24`
-                    : h107dia > 0 ? ' · A107' : ' · A24'}
+                  {porSedeDia.length > 1
+                    ? ' — ' + porSedeDia.map(x => `${x.horas}h ${x.val}`).join(' · ')
+                    : porSedeDia.length === 1 ? ` · ${porSedeDia[0].val}` : ''}
                   )
                 </span>
               </div>
@@ -374,11 +376,8 @@ function ClasesList({ titulo, porFecha, fechas, proyectada, discLabel, discColor
                     >
                       {discLabel[c.disciplina] || c.disciplina}
                     </span>
-                    <span className={clsx(
-                      'text-xs flex-shrink-0 font-medium',
-                      c.sede === '107' ? 'text-indigo-400' : 'text-cyan-400'
-                    )}>
-                      {c.sede === '107' ? 'A107' : 'A24'}
+                    <span className="text-xs flex-shrink-0 font-medium" style={{ color: sedeColor(c.sede) }}>
+                      {c.sede}
                     </span>
                     {c.es_modificacion && (
                       <span className="ml-auto text-yellow-500 flex items-center gap-1 flex-shrink-0">

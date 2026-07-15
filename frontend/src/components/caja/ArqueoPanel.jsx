@@ -52,7 +52,7 @@ export default function ArqueoPanel({ arqueo, defaultMes, onClose, onSaved }) {
       cant_10:    arqueo.cant_10,
     } : {
       fecha:         hoy,
-      sede:          '107',
+      sede:          sedeOptions[0]?.val || '107',
       saldo_inicial: '0',
       queda_en_caja: '0',
       notas:         '',

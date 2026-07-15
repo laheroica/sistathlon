@@ -3,10 +3,12 @@ import { X, Lock, Save, Loader2, AlertTriangle, CheckCircle } from 'lucide-react
 import clsx from 'clsx'
 import api from '../../lib/api'
 import { money } from '../../lib/format'
+import { useNegocio } from '../../hooks/useNegocio'
 
 const HOY = new Date().toISOString().slice(0, 10)
 
 export default function CierreMesPanel({ profes, mes, mesLabel, onClose, onCerrado }) {
+  const { sedeOptions } = useNegocio()
   // Estado editable por profe: { [profe_id]: { monto_final, notas } }
   const [ajustes, setAjustes] = useState(() => {
     const init = {}
@@ -90,8 +92,9 @@ export default function CierreMesPanel({ profes, mes, mesLabel, onClose, onCerra
             const aj = ajustes[p.profe_id] ?? {}
             const clases = p.clases ?? []
             const dadas  = clases.filter(c => c.fecha <= HOY)
-            const d107   = dadas.filter(c => c.sede === '107').length
-            const d24    = dadas.filter(c => c.sede === '24').length
+            const porSede = sedeOptions
+              .map(o => ({ ...o, horas: dadas.filter(c => c.sede === o.val).length }))
+              .filter(x => x.horas > 0)
 
             return (
               <div key={p.profe_id} className="bg-dark-bg border border-dark-border rounded-xl p-4 space-y-3">
@@ -105,8 +108,9 @@ export default function CierreMesPanel({ profes, mes, mesLabel, onClose, onCerra
                   </div>
                   <span className="text-sm font-semibold text-dark-text">{p.profe_nombre}</span>
                   <span className="text-xs text-dark-muted">
-                    {d107 > 0 && <span className="text-indigo-400 mr-1">A107 {d107}h</span>}
-                    {d24  > 0 && <span className="text-cyan-400">A24 {d24}h</span>}
+                    {porSede.map(x => (
+                      <span key={x.val} className="mr-1" style={{ color: x.color }}>{x.label} {x.horas}h</span>
+                    ))}
                   </span>
                 </div>
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Calendar, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, AlertTriangle, Grid, Ban } from 'lucide-react'
 import clsx from 'clsx'
@@ -58,7 +58,13 @@ function fmtSemana(lunes) {
 export default function HorariosPage() {
   const { sedeOptions } = useNegocio()
   const [vista,  setVista]  = useState('semana')   // 'semana' | 'maestra'
-  const [sede,   setSede]   = useState('107')
+  const [sede,   setSede]   = useState(sedeOptions[0]?.val || '107')
+  // Si la sede seleccionada no existe entre las configuradas, caer a la primera
+  useEffect(() => {
+    if (sedeOptions.length && !sedeOptions.some(s => s.val === sede)) {
+      setSede(sedeOptions[0].val)
+    }
+  }, [sedeOptions, sede])
   const [lunes,  setLunes]  = useState(() => lunesDe(new Date()))
   const [panel,  setPanel]  = useState(null)
   const [modPanel, setModPanel] = useState(null)  // { horario, fecha } | null

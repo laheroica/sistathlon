@@ -11,7 +11,7 @@ function estado(p) {
   return               { texto: 'PENDIENTE',   color: '#6b7280' }
 }
 
-function paginaProfe(p, mesLabel, discLabel, logoUrl, nombre) {
+function paginaProfe(p, mesLabel, discLabel, logoUrl, nombre, sedeLabels = {}) {
   const clases = [...(p.clases ?? [])].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora))
   const porDia = []
   let diaActual = null
@@ -48,7 +48,7 @@ function paginaProfe(p, mesLabel, discLabel, logoUrl, nombre) {
         <tr>
           <td style="padding:4px 10px; font-size:11px; color:#111827;">${c.hora}</td>
           <td style="padding:4px 10px; font-size:11px; color:#111827;">${discLabel[c.disciplina] ?? c.disciplina}</td>
-          <td style="padding:4px 10px; font-size:11px; color:#6b7280;">Athlon ${c.sede}</td>
+          <td style="padding:4px 10px; font-size:11px; color:#6b7280;">${sedeLabels[c.sede] || c.sede}</td>
         </tr>
       `).join('')}
     `
@@ -105,6 +105,7 @@ export function abrirPDFLiquidaciones(profes, mesLabel, discLabelMap = {}, brand
   const discLabel = { ...DISC_LABEL_FB, ...discLabelMap }
   const logoUrl = branding.logoUrl || `${window.location.origin}${logoNegroAsset}`
   const nombre  = branding.nombre || 'Athlon'
+  const sedeLabels = branding.sedeLabels || {}
   const titulo = profes.length === 1
     ? `Liquidación ${profes[0].profe_nombre} — ${mesLabel}`
     : `Liquidaciones ${mesLabel}`
@@ -148,7 +149,7 @@ export function abrirPDFLiquidaciones(profes, mesLabel, discLabelMap = {}, brand
   </style>
 </head>
 <body>
-  ${profes.map(p => paginaProfe(p, mesLabel, discLabel, logoUrl, nombre)).join('')}
+  ${profes.map(p => paginaProfe(p, mesLabel, discLabel, logoUrl, nombre, sedeLabels)).join('')}
   <script>window.onload = () => window.print()<\/script>
 </body>
 </html>`

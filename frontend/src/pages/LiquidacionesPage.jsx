@@ -50,6 +50,7 @@ export default function LiquidacionesPage() {
   const { labelMap: discLabelMap } = useDisciplinas()
   const { brandingPDF, sedeOptions } = useNegocio()
   const SEDES = [{ val: '', label: 'Ambas' }, ...sedeOptions]
+  const codes = sedeOptions.map(o => o.val)
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['liquidaciones-preview', mes],
@@ -78,20 +79,24 @@ export default function LiquidacionesPage() {
     if (!sede) return todosLos
     return todosLos.filter(p =>
       (p.clases ?? []).some(c => c.sede === sede && c.fecha <= HOY) ||
-      montoAcumulado(p, sede) > 0   // fijos/mixtos sin clases (ej. sueldo del dueño)
+      montoAcumulado(p, sede, codes) > 0   // fijos/mixtos sin clases (ej. sueldo del dueño)
     )
-  }, [todosLos, sede])
+  }, [todosLos, sede, codes])
 
   const pendientes  = profes.filter(p => !p.confirmada)
   const confirmadas = profes.filter(p => p.confirmada && !p.pagada)
   const pagadas     = profes.filter(p => p.pagada)
 
-  const acum107   = useMemo(() => todosLos.reduce((s, p) => s + montoAcumulado(p, '107'), 0), [todosLos])
-  const acum24    = useMemo(() => todosLos.reduce((s, p) => s + montoAcumulado(p, '24'),  0), [todosLos])
-  const acumTotal = acum107 + acum24
-  const proy107   = useMemo(() => todosLos.reduce((s, p) => s + montoProyectado(p, '107'), 0), [todosLos])
-  const proy24    = useMemo(() => todosLos.reduce((s, p) => s + montoProyectado(p, '24'),  0), [todosLos])
-  const proyTotal = proy107 + proy24
+  const acumPorSede = useMemo(
+    () => sedeOptions.map(o => ({
+      ...o,
+      acum: todosLos.reduce((s, p) => s + montoAcumulado(p, o.val, codes), 0),
+      proy: todosLos.reduce((s, p) => s + montoProyectado(p, o.val, codes), 0),
+    })),
+    [todosLos, sedeOptions, codes]
+  )
+  const acumTotal = acumPorSede.reduce((s, x) => s + x.acum, 0)
+  const proyTotal = acumPorSede.reduce((s, x) => s + x.proy, 0)
 
   // ¿El mes actual ya está cerrado?
   const mesCerrado = todosLos.length > 0 && todosLos.every(p => p.confirmada)
@@ -207,24 +212,17 @@ export default function LiquidacionesPage() {
               </p>
             )}
           </div>
-          <div className="card py-3">
-            <p className="text-xs text-dark-muted mb-1">Acumulado <span className="text-indigo-400 font-semibold">A107</span></p>
-            <p className="text-lg font-bold text-indigo-400">{money(acum107)}</p>
-            {proy107 > acum107 && (
-              <p className="text-xs text-dark-muted mt-1 flex items-center gap-1">
-                <TrendingUp size={10}/> {money(proy107)} fin de mes
-              </p>
-            )}
-          </div>
-          <div className="card py-3">
-            <p className="text-xs text-dark-muted mb-1">Acumulado <span className="text-cyan-400 font-semibold">A24</span></p>
-            <p className="text-lg font-bold text-cyan-400">{money(acum24)}</p>
-            {proy24 > acum24 && (
-              <p className="text-xs text-dark-muted mt-1 flex items-center gap-1">
-                <TrendingUp size={10}/> {money(proy24)} fin de mes
-              </p>
-            )}
-          </div>
+          {acumPorSede.map(o => (
+            <div key={o.val} className="card py-3">
+              <p className="text-xs text-dark-muted mb-1">Acumulado <span className="font-semibold" style={{ color: o.color }}>{o.label}</span></p>
+              <p className="text-lg font-bold" style={{ color: o.color }}>{money(o.acum)}</p>
+              {o.proy > o.acum && (
+                <p className="text-xs text-dark-muted mt-1 flex items-center gap-1">
+                  <TrendingUp size={10}/> {money(o.proy)} fin de mes
+                </p>
+              )}
+            </div>
+          ))}
           <div className="card py-3">
             <p className="text-xs text-dark-muted mb-1">Confirmadas / Pagadas</p>
             <p className="text-lg font-bold text-dark-text">
@@ -312,22 +310,24 @@ export default function LiquidacionesPage() {
 
 // ── Fila de profe ─────────────────────────────────────────────────────────────
 function ProfeRow({ profe: p, sede, onVer }) {
+  const { sedeOptions } = useNegocio()
+  const codes = sedeOptions.map(o => o.val)
   const clases      = p.clases ?? []
   const dadas       = clases.filter(c => c.fecha <= HOY)
   const proyectadas = clases.filter(c => c.fecha >  HOY)
 
-  const d107 = dadas.filter(c => c.sede === '107').length
-  const d24  = dadas.filter(c => c.sede === '24').length
-
-  const acum107   = montoAcumulado(p, '107')
-  const acum24    = montoAcumulado(p, '24')
-  const acumTotal = acum107 + acum24
-
-  const proy107   = montoProyectado(p, '107')
-  const proy24    = montoProyectado(p, '24')
-  const proyTotal = proy107 + proy24
+  // Datos por sede: horas dadas, acumulado hasta hoy y proyección a fin de mes
+  const porSede = sedeOptions.map(o => ({
+    val: o.val, label: o.val, color: o.color,
+    horas: dadas.filter(c => c.sede === o.val).length,
+    acum:  montoAcumulado(p, o.val, codes),
+    proy:  montoProyectado(p, o.val, codes),
+  }))
+  const acumTotal = porSede.reduce((s, x) => s + x.acum, 0)
+  const proyTotal = porSede.reduce((s, x) => s + x.proy, 0)
 
   const mostrarAmbas = !sede
+  const sel = sede ? porSede.find(x => x.val === sede) : null
 
   return (
     <div
@@ -365,31 +365,18 @@ function ProfeRow({ profe: p, sede, onVer }) {
 
           <div className="flex items-center gap-4 mt-1.5 flex-wrap">
             {mostrarAmbas ? (
-              <>
-                {d107 > 0 && (
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <span className="text-indigo-400 font-semibold">A107</span>
-                    <span className="text-dark-muted">{d107}h</span>
-                    <span className="text-indigo-400 font-bold">{money(acum107)}</span>
-                  </div>
-                )}
-                {d24 > 0 && (
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <span className="text-cyan-400 font-semibold">A24</span>
-                    <span className="text-dark-muted">{d24}h</span>
-                    <span className="text-cyan-400 font-bold">{money(acum24)}</span>
-                  </div>
-                )}
-              </>
-            ) : (
+              porSede.filter(x => x.horas > 0).map(x => (
+                <div key={x.val} className="flex items-center gap-1.5 text-xs">
+                  <span className="font-semibold" style={{ color: x.color }}>{x.label}</span>
+                  <span className="text-dark-muted">{x.horas}h</span>
+                  <span className="font-bold" style={{ color: x.color }}>{money(x.acum)}</span>
+                </div>
+              ))
+            ) : sel && (
               <div className="flex items-center gap-1.5 text-xs">
-                <span className={clsx('font-semibold', sede === '107' ? 'text-indigo-400' : 'text-cyan-400')}>
-                  A{sede}
-                </span>
-                <span className="text-dark-muted">{sede === '107' ? d107 : d24}h</span>
-                <span className={clsx('font-bold', sede === '107' ? 'text-indigo-400' : 'text-cyan-400')}>
-                  {money(sede === '107' ? acum107 : acum24)}
-                </span>
+                <span className="font-semibold" style={{ color: sel.color }}>{sel.label}</span>
+                <span className="text-dark-muted">{sel.horas}h</span>
+                <span className="font-bold" style={{ color: sel.color }}>{money(sel.acum)}</span>
               </div>
             )}
             {proyectadas.length > 0 && (
@@ -400,12 +387,9 @@ function ProfeRow({ profe: p, sede, onVer }) {
           {proyTotal > acumTotal && (
             <p className="text-xs text-dark-muted mt-1">
               Proyección fin de mes:
-              {mostrarAmbas && proy107 > 0 && (
-                <span className="ml-1 text-indigo-400/60">A107 {money(proy107)}</span>
-              )}
-              {mostrarAmbas && proy24 > 0 && (
-                <span className="ml-1 text-cyan-400/60">A24 {money(proy24)}</span>
-              )}
+              {mostrarAmbas && porSede.filter(x => x.proy > 0).map(x => (
+                <span key={x.val} className="ml-1" style={{ color: x.color, opacity: 0.6 }}>{x.label} {money(x.proy)}</span>
+              ))}
               <span className="ml-1 font-semibold text-dark-text/50">{money(proyTotal)}</span>
             </p>
           )}

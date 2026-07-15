@@ -51,9 +51,10 @@ function waLink(celular, texto) {
 // ---------------------------------------------------------------------------
 
 function SedeTabs({ sede, setSede }) {
+  const { sedeOptions } = useNegocio()
   return (
     <div className="flex gap-1 bg-dark-bg rounded-xl p-1 border border-dark-border">
-      {[['', 'Ambas'], ['107', '107'], ['24', '24']].map(([v, l]) => (
+      {[['', 'Ambas'], ...sedeOptions.map(s => [s.val, s.val])].map(([v, l]) => (
         <button key={v} onClick={() => setSede(v)}
           className={clsx('px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
             sede === v ? 'bg-indigo-700 text-white' : 'text-dark-muted hover:text-dark-text'
