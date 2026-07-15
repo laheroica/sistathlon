@@ -3,6 +3,8 @@ FROM node:20-alpine AS frontend-build
 WORKDIR /frontend
 COPY frontend/package.json ./
 RUN npm install
+# Cache-bust: forzar recompilado del frontend cuando cambia el source
+ARG CACHEBUST=20260715-2
 COPY frontend/ ./
 RUN npm run build
 
