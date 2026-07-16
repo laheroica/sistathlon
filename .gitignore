@@ -51,3 +51,5 @@ _spec_tmp.zip
 # Scripts personales / one-off y dumps (no forman parte del producto)
 backend/scripts/
 *.dump
+
+frontend/.vite/
