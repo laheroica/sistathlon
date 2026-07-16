@@ -34,6 +34,52 @@ class Producto(models.Model):
         return f"{self.nombre} ({self.get_categoria_display()})"
 
 
+# Ubicación reservada para el depósito general (además de los códigos de sede)
+DEPOSITO = 'deposito'
+
+
+class MovimientoStock(models.Model):
+    """Libro de movimientos de stock. El stock de cada ubicación se calcula
+    sumando lo que entra (destino) y restando lo que sale (origen).
+
+    - Ingreso  : origen='',        destino='deposito'   (+ costo/proveedor)
+    - Envío    : origen='deposito', destino=<sede>
+    - Venta    : origen=<sede>,     destino=''           (link a Venta)
+    - Ajuste + : origen='',         destino=<ubicación>
+    - Ajuste − : origen=<ubicación>, destino=''
+    """
+    TIPOS = [
+        ('ingreso', 'Ingreso'),
+        ('envio',   'Envío'),
+        ('venta',   'Venta'),
+        ('ajuste',  'Ajuste'),
+    ]
+    producto  = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name='movimientos')
+    fecha     = models.DateField()
+    tipo      = models.CharField(max_length=10, choices=TIPOS)
+    cantidad  = models.PositiveIntegerField()
+    origen    = models.CharField(max_length=10, blank=True, default='')   # de dónde sale ('' = entra al sistema)
+    destino   = models.CharField(max_length=10, blank=True, default='')   # a dónde entra ('' = sale del sistema)
+
+    # Solo para ingresos: costo y proveedor (para calcular margen)
+    costo_unitario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    proveedor      = models.CharField(max_length=120, blank=True, default='')
+
+    venta          = models.ForeignKey('Venta', on_delete=models.SET_NULL, null=True, blank=True, related_name='movimientos_stock')
+    notas          = models.CharField(max_length=200, blank=True, default='')
+    registrado_por = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True)
+    creado         = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha', '-id']
+        verbose_name = 'Movimiento de stock'
+        verbose_name_plural = 'Movimientos de stock'
+
+    def __str__(self):
+        ruta = f"{self.origen or '—'} → {self.destino or '—'}"
+        return f"{self.get_tipo_display()} {self.cantidad}× {self.producto.nombre} ({ruta})"
+
+
 class Venta(models.Model):
     fecha            = models.DateField()
     alumno           = models.ForeignKey(
@@ -96,3 +142,31 @@ class MovimientoCuentaCorriente(models.Model):
 
     def __str__(self):
         return f"{self.alumno} — {self.tipo} ${self.monto:,.0f} — {self.fecha}"
+
+
+def calcular_stock(producto_ids=None):
+    """Stock actual por ubicación, calculado del libro de movimientos.
+    Devuelve {producto_id: {ubicacion: cantidad}}."""
+    from django.db.models import Sum
+    movs = MovimientoStock.objects.all()
+    if producto_ids is not None:
+        movs = movs.filter(producto_id__in=list(producto_ids))
+    stock = {}
+    for row in movs.exclude(destino='').values('producto_id', 'destino').annotate(t=Sum('cantidad')):
+        d = stock.setdefault(row['producto_id'], {})
+        d[row['destino']] = d.get(row['destino'], 0) + (row['t'] or 0)
+    for row in movs.exclude(origen='').values('producto_id', 'origen').annotate(t=Sum('cantidad')):
+        d = stock.setdefault(row['producto_id'], {})
+        d[row['origen']] = d.get(row['origen'], 0) - (row['t'] or 0)
+    return stock
+
+
+def costo_actual(producto_ids=None):
+    """Último costo unitario cargado por producto (para margen). {producto_id: costo}."""
+    costos = {}
+    qs = MovimientoStock.objects.filter(tipo='ingreso', costo_unitario__isnull=False)
+    if producto_ids is not None:
+        qs = qs.filter(producto_id__in=list(producto_ids))
+    for m in qs.order_by('producto_id', '-fecha', '-id'):
+        costos.setdefault(m.producto_id, float(m.costo_unitario))
+    return costos

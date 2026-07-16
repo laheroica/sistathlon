@@ -6,6 +6,8 @@ urlpatterns = [
     path('<int:pk>/', views.ProductoDetailView.as_view()),
     path('ventas/', views.VentaListCreateView.as_view()),
     path('ventas/<int:pk>/', views.VentaDetailView.as_view()),
+    path('movimientos/', views.MovimientoStockListCreateView.as_view()),
+    path('movimientos/<int:pk>/', views.MovimientoStockDetailView.as_view()),
     path('cuenta-corriente/deudores/', views.deudores),
     path('cuenta-corriente/movimientos/<int:pk>/', views.MovimientoCCDetailView.as_view()),
     path('cuenta-corriente/<int:alumno_id>/', views.cuenta_corriente_alumno),

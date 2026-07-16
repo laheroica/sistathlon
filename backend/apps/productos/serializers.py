@@ -1,23 +1,76 @@
 from rest_framework import serializers
-from .models import Producto, Venta, VentaItem, MovimientoCuentaCorriente
+from .models import Producto, Venta, VentaItem, MovimientoCuentaCorriente, MovimientoStock, DEPOSITO
 
 
 class ProductoSerializer(serializers.ModelSerializer):
     categoria_label = serializers.SerializerMethodField()
     stock_total     = serializers.SerializerMethodField()
+    stock_ubic      = serializers.SerializerMethodField()  # {ubicacion: cantidad}
+    costo           = serializers.SerializerMethodField()   # último costo unitario
+    margen          = serializers.SerializerMethodField()   # precio - costo
 
     class Meta:
         model  = Producto
         fields = [
             'id', 'nombre', 'categoria', 'categoria_label', 'precio',
-            'stock_107', 'stock_24', 'stock_total', 'activo',
+            'stock_ubic', 'stock_total', 'costo', 'margen', 'activo',
         ]
+
+    # El stock/costo se inyectan por contexto desde la vista (cálculo en lote)
+    def _stock(self, obj):
+        return (self.context.get('stock_map') or {}).get(obj.id, {})
 
     def get_categoria_label(self, obj):
         return obj.get_categoria_display()
 
+    def get_stock_ubic(self, obj):
+        return self._stock(obj)
+
     def get_stock_total(self, obj):
-        return obj.stock_107 + obj.stock_24
+        return sum(self._stock(obj).values())
+
+    def get_costo(self, obj):
+        return (self.context.get('costo_map') or {}).get(obj.id)
+
+    def get_margen(self, obj):
+        c = self.get_costo(obj)
+        return float(obj.precio) - c if c is not None else None
+
+
+class MovimientoStockSerializer(serializers.ModelSerializer):
+    producto_nombre = serializers.SerializerMethodField()
+    tipo_label      = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = MovimientoStock
+        fields = [
+            'id', 'producto', 'producto_nombre', 'fecha', 'tipo', 'tipo_label',
+            'cantidad', 'origen', 'destino', 'costo_unitario', 'proveedor', 'notas', 'creado',
+        ]
+        read_only_fields = ['creado']
+
+    def get_producto_nombre(self, obj):
+        return obj.producto.nombre
+
+    def get_tipo_label(self, obj):
+        return obj.get_tipo_display()
+
+    def validate(self, data):
+        tipo = data.get('tipo')
+        if data.get('cantidad', 0) <= 0:
+            raise serializers.ValidationError({'cantidad': 'Debe ser mayor a 0.'})
+        # Normalizar origen/destino según el tipo
+        if tipo == 'ingreso':
+            data['origen'] = ''
+            data['destino'] = DEPOSITO
+        elif tipo == 'envio':
+            data['origen'] = DEPOSITO
+            if not data.get('destino'):
+                raise serializers.ValidationError({'destino': 'Elegí la sucursal destino.'})
+        elif tipo == 'ajuste':
+            if not (data.get('origen') or data.get('destino')):
+                raise serializers.ValidationError('El ajuste necesita una ubicación.')
+        return data
 
 
 class VentaItemReadSerializer(serializers.ModelSerializer):
@@ -80,13 +133,12 @@ class VentaSerializer(serializers.ModelSerializer):
                 precio_unitario=precio_u,
             )
 
-            # Descontar del stock de la sede de la venta
-            if sede == '107':
-                producto.stock_107 = max(0, producto.stock_107 - cantidad)
-                producto.save(update_fields=['stock_107'])
-            else:
-                producto.stock_24 = max(0, producto.stock_24 - cantidad)
-                producto.save(update_fields=['stock_24'])
+            # Registrar la salida de stock de la sede en el libro de movimientos
+            MovimientoStock.objects.create(
+                producto=producto, fecha=venta.fecha, tipo='venta',
+                cantidad=cantidad, origen=sede, destino='',
+                venta=venta, registrado_por=venta.registrado_por,
+            )
 
         if venta.metodo_pago == 'cuenta_corriente' and venta.alumno_id:
             MovimientoCuentaCorriente.objects.create(

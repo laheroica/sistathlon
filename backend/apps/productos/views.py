@@ -6,8 +6,19 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Producto, Venta, VentaItem, MovimientoCuentaCorriente
-from .serializers import ProductoSerializer, VentaSerializer, MovimientoCCSerializer
+from .models import (
+    Producto, Venta, VentaItem, MovimientoCuentaCorriente,
+    MovimientoStock, calcular_stock, costo_actual,
+)
+from .serializers import (
+    ProductoSerializer, VentaSerializer, MovimientoCCSerializer,
+    MovimientoStockSerializer,
+)
+
+
+def _stock_context():
+    """Stock por ubicación y último costo de todos los productos (cálculo en lote)."""
+    return {'stock_map': calcular_stock(), 'costo_map': costo_actual()}
 
 
 # ── Productos ──────────────────────────────────────────────────────────────────
@@ -26,11 +37,17 @@ class ProductoListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(categoria=categoria)
         return qs
 
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), **_stock_context()}
+
 
 class ProductoDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class   = ProductoSerializer
     permission_classes = [IsAuthenticated]
     queryset           = Producto.objects.all()
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), **_stock_context()}
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -45,6 +62,33 @@ class ProductoDetailView(generics.RetrieveUpdateDestroyAPIView):
                 {'desactivado': True, 'detail': 'El producto tiene ventas registradas y no puede eliminarse. Se desactivó.'},
                 status=status.HTTP_200_OK,
             )
+
+
+# ── Movimientos de stock (ingreso / envío / ajuste) ─────────────────────────────
+
+class MovimientoStockListCreateView(generics.ListCreateAPIView):
+    serializer_class   = MovimientoStockSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class   = None
+
+    def get_queryset(self):
+        qs = MovimientoStock.objects.select_related('producto').all()
+        producto = self.request.query_params.get('producto')
+        tipo     = self.request.query_params.get('tipo')
+        if producto:
+            qs = qs.filter(producto_id=producto)
+        if tipo:
+            qs = qs.filter(tipo=tipo)
+        return qs[:400]
+
+    def perform_create(self, serializer):
+        serializer.save(registrado_por=self.request.user)
+
+
+class MovimientoStockDetailView(generics.RetrieveDestroyAPIView):
+    serializer_class   = MovimientoStockSerializer
+    permission_classes = [IsAuthenticated]
+    queryset           = MovimientoStock.objects.all()
 
 
 # ── Ventas ─────────────────────────────────────────────────────────────────────
