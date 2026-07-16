@@ -1,5 +1,5 @@
 from datetime import date
-from django.db.models import Sum, Count, ExpressionWrapper, DecimalField, F
+from django.db.models import Sum, Count, ExpressionWrapper, DecimalField, F, Q
 from django.db.models.functions import TruncMonth
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -135,22 +135,29 @@ def personalizado(request):
     grupos = []
     ids_totales = set()
 
-    def serializar_alumnos(qs, pagos_por_alumno, campo_horario='horario'):
+    def serializar_alumnos(qs, pagos_por_alumno, campo_horario='horario', disc_cod=None):
         alumnos = list(qs.order_by('sede', 'apellido', 'nombre'))
-        return [
-            {
+        out = []
+        for a in alumnos:
+            sede = a.sede
+            horario = getattr(a, campo_horario, '') or ''
+            # Si aparece en este grupo por su 2da actividad, mostrar sus datos secundarios
+            if disc_cod and a.disciplina != disc_cod and a.disciplina_2 == disc_cod:
+                sede = a.sede_2 or a.sede
+                horario = a.horario_2 or ''
+            out.append({
                 'id': a.id,
                 'nombre': a.nombre_completo,
-                'sede': a.sede,
-                'horario': getattr(a, campo_horario, '') or '',
+                'sede': sede,
+                'horario': horario,
                 'monto_pagado': float(pagos_por_alumno.get(a.id, 0)),
-            }
-            for a in alumnos
-        ]
+            })
+        return out
 
-    # Grupos "puros": disciplina seleccionada sin combo, solo quienes pagaron el mes
+    # Grupos "puros": disciplina seleccionada (principal o 2da actividad), sin
+    # combo, solo quienes pagaron el mes
     for cod in codigos:
-        qs = base_qs.filter(disciplina=cod, combo='', id__in=pagadores_ids)
+        qs = base_qs.filter(Q(disciplina=cod) | Q(disciplina_2=cod)).filter(combo='', id__in=pagadores_ids)
         ids = list(qs.values_list('id', flat=True))
         if ids:
             ids_totales.update(ids)
@@ -161,7 +168,7 @@ def personalizado(request):
             'label': nombres.get(cod, cod),
             'tipo': 'puro',
             'cantidad': len(ids),
-            'alumnos': serializar_alumnos(qs, pagos_por_alumno, 'horario'),
+            'alumnos': serializar_alumnos(qs, pagos_por_alumno, 'horario', disc_cod=cod),
         })
 
     # Grupos "combo": se muestran si están tildadas todas las disciplinas del combo,
@@ -392,18 +399,34 @@ def anual(request):
 
     total_activos = len(set(pagadores_ids))
 
-    por_disciplina = list(
+    # Conteos por disciplina/sede contando también la 2da actividad: un alumno
+    # con dos disciplinas suma en ambas, y con dos sedes suma en ambas.
+    from collections import Counter
+
+    def contar(qs_values, campo, campo_2):
+        c = Counter()
+        for row in qs_values:
+            if row[campo]:
+                c[row[campo]] += 1
+            if row.get(campo_2):
+                c[row[campo_2]] += 1
+        return c
+
+    activos_vals = list(
         Alumno.objects.filter(id__in=pagadores_ids)
-        .values('disciplina').annotate(cant=Count('id')).order_by('-cant')
+        .values('disciplina', 'disciplina_2', 'sede', 'sede_2')
     )
+    disc_c = contar(activos_vals, 'disciplina', 'disciplina_2')
+    sede_c = contar(activos_vals, 'sede', 'sede_2')
+    por_disciplina = [{'disciplina': k, 'cant': v} for k, v in disc_c.most_common()]
+    por_sede       = [{'sede': k, 'cant': v} for k, v in sede_c.most_common()]
+
     # Histórico: todos los alumnos que alguna vez pasaron por el gym
-    por_disciplina_historico = list(
-        Alumno.objects.values('disciplina').annotate(cant=Count('id')).order_by('-cant')
+    hist_c = contar(
+        Alumno.objects.values('disciplina', 'disciplina_2'),
+        'disciplina', 'disciplina_2',
     )
-    por_sede = list(
-        Alumno.objects.filter(id__in=pagadores_ids)
-        .values('sede').annotate(cant=Count('id'))
-    )
+    por_disciplina_historico = [{'disciplina': k, 'cant': v} for k, v in hist_c.most_common()]
 
     # Variaciones del último mes vs anterior
     ultimo   = series[-1]  if len(series) >= 1 else {}
