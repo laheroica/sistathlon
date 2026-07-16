@@ -39,6 +39,7 @@ export default function NuevoAlumnoPage() {
     nombre: '', apellido: '', dni: '', celular: '', email: '', instagram: '',
     fecha_nacimiento: '', sede: '', fecha_inicio: new Date().toISOString().split('T')[0],
     disciplina: '', frecuencia: '', tipo_precio: 'regular', horario: '', bonus_pack: false, notas: '',
+    disciplina_2: '', frecuencia_2: '', sede_2: '', horario_2: '',
     cuota_actual: 0, pertenencia: 'athlon', porcentaje_athlon: 100, precio_especial: false, motivo_precio_especial: '',
   })
   const [cuotaInfo, setCuotaInfo]     = useState(null)
@@ -329,6 +330,59 @@ export default function NuevoAlumnoPage() {
                   <span className="text-sm text-dark-text">Bonus Pack (+$15.000)</span>
                 </label>
               </div>
+            </div>
+
+            {/* Segunda actividad (opcional) */}
+            <div className="border-t border-dark-border pt-3">
+              <label className="block text-xs text-dark-muted mb-1.5">Segunda actividad (opcional)</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[{ value: '', label: 'Ninguna' }, ...DISCIPLINAS].map(({ value, label }) => (
+                  <button
+                    key={value || 'none'}
+                    type="button"
+                    onClick={() => {
+                      set('disciplina_2', value)
+                      if (!value) { set('frecuencia_2', ''); set('sede_2', ''); set('horario_2', '') }
+                      else {
+                        const opts = FRECUENCIAS[value] || []
+                        set('frecuencia_2', opts.length === 1 ? opts[0].value : '')
+                        if (!form.sede_2) set('sede_2', form.sede)
+                      }
+                    }}
+                    className={clsx(
+                      'py-2 px-3 rounded-lg text-sm border transition-colors',
+                      form.disciplina_2 === value
+                        ? 'border-purple-500 bg-purple-500/20 text-purple-300 font-medium'
+                        : 'border-dark-border text-dark-muted hover:border-dark-text'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {form.disciplina_2 && (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs text-dark-muted mb-1">Sede</label>
+                    <select className="input" value={form.sede_2} onChange={(e) => set('sede_2', e.target.value)}>
+                      {sedeOptions.map(s => <option key={s.val} value={s.val}>{s.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-dark-muted mb-1">Frecuencia</label>
+                    <select className="input" value={form.frecuencia_2} onChange={(e) => set('frecuencia_2', e.target.value)}>
+                      <option value="">—</option>
+                      {(FRECUENCIAS[form.disciplina_2] || []).map(({ value, label }) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-dark-muted mb-1">Horario</label>
+                    <input className="input" placeholder="ej: 19hs" value={form.horario_2} onChange={(e) => set('horario_2', e.target.value)} />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Precio especial */}

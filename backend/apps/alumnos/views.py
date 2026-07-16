@@ -112,9 +112,11 @@ class AlumnoListView(generics.ListAPIView):
         horario = self.request.query_params.get('horario')
 
         if sede:
-            qs = qs.filter(sede=sede)
+            # Incluye la segunda actividad: un alumno puede estar en dos sedes
+            qs = qs.filter(Q(sede=sede) | Q(sede_2=sede))
         if disciplina:
-            qs = qs.filter(disciplina=disciplina)
+            # Incluye la segunda disciplina (ej. Funcional + Hyrox)
+            qs = qs.filter(Q(disciplina=disciplina) | Q(disciplina_2=disciplina))
         if estado:
             qs = qs.filter(estado=estado)
         if horario:

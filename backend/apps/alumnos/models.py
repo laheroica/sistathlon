@@ -85,6 +85,13 @@ class Alumno(models.Model):
     horario_combo = models.CharField(max_length=20, blank=True,
         help_text='Horario de la disciplina combo (ej: Hyrox). Solo aplica cuando combo != ""')
 
+    # Segunda actividad (opcional): permite que un alumno haga otra disciplina,
+    # incluso en otra sede (ej. Funcional en la 24 + Hyrox en la 107).
+    disciplina_2 = models.CharField(max_length=5, blank=True, default='', choices=Disciplina.choices)
+    frecuencia_2 = models.CharField(max_length=10, blank=True, default='', choices=Frecuencia.choices)
+    sede_2       = models.CharField(max_length=10, blank=True, default='')  # código de Sede; puede diferir de sede
+    horario_2    = models.CharField(max_length=20, blank=True, default='')
+
     # Pertenencia (espacio que gestiona al alumno)
     pertenencia = models.CharField(max_length=10, choices=Pertenencia.choices, default=Pertenencia.ATHLON)
     porcentaje_athlon = models.DecimalField(max_digits=5, decimal_places=2, default=100,

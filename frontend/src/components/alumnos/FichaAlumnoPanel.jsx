@@ -461,6 +461,63 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
               </div>
             )}
           </div>
+
+          {/* ── Segunda actividad (opcional): otra disciplina, incluso en otra sede ── */}
+          <div className="border-t border-dark-border pt-3">
+            <p className="text-xs font-semibold text-dark-muted uppercase tracking-wider mb-2">
+              Segunda actividad <span className="normal-case font-normal text-dark-muted/70">(opcional)</span>
+            </p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-dark-muted mb-1.5">Disciplina</p>
+                <ChipSelector
+                  options={[{ value: '', label: 'Ninguna' }, ...Object.entries(DISC_LABEL).map(([v, l]) => ({ value: v, label: l }))]}
+                  value={alumno.disciplina_2 || ''}
+                  onChange={(v) => {
+                    setPend('disciplina_2', v)
+                    if (!v) { setPend('frecuencia_2', ''); setPend('sede_2', ''); setPend('horario_2', '') }
+                    else {
+                      if (!alumno.frecuencia_2) setPend('frecuencia_2', FRECUENCIAS[v]?.[0] || '')
+                      if (!alumno.sede_2) setPend('sede_2', alumno.sede)
+                    }
+                  }}
+                  renderLabel={(val, lbl) => (
+                    <span className={clsx(val && alumno.disciplina_2 === val && DISC_BADGE[val], 'rounded px-1')}>{lbl}</span>
+                  )}
+                />
+              </div>
+              {alumno.disciplina_2 && (
+                <>
+                  <div>
+                    <p className="text-xs text-dark-muted mb-1.5">Sede de la 2da actividad</p>
+                    <ChipSelector
+                      options={sedeOptions.map(s => ({ value: s.val, label: s.label }))}
+                      value={alumno.sede_2 || alumno.sede}
+                      onChange={(v) => setPend('sede_2', v)}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs text-dark-muted mb-1.5">Frecuencia</p>
+                    <ChipSelector
+                      options={(FRECUENCIAS[alumno.disciplina_2] || ['2x','3x']).map(f => ({ value: f, label: FREQ_LABEL[f] }))}
+                      value={alumno.frecuencia_2 || ''}
+                      onChange={(v) => setPend('frecuencia_2', v)}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs text-dark-muted mb-1.5">Horario</p>
+                    <input
+                      className="input w-32 text-sm"
+                      placeholder="ej: 19:00"
+                      value={alumno.horario_2 || ''}
+                      onChange={(e) => setPend('horario_2', e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* Botón guardar actividad */}
           {hayPendiente && (
             <button

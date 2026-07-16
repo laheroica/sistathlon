@@ -334,6 +334,12 @@ function AlumnoRow({ alumno, onPago, onMensaje, esImpago, badgeMap = DISC_BADGE,
             {labelMap[alumno.disciplina] || alumno.disciplina}
           </span>
           <span className="text-xs text-dark-muted">{alumno.frecuencia}</span>
+          {alumno.disciplina_2 && (
+            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-md bg-purple-900/50 text-purple-200"
+              title={`También hace ${labelMap[alumno.disciplina_2] || alumno.disciplina_2}${alumno.sede_2 ? ' en sede ' + alumno.sede_2 : ''}`}>
+              +{labelMap[alumno.disciplina_2] || alumno.disciplina_2}
+            </span>
+          )}
           {alumno.bonus_pack && (
             <span className="text-xs bg-sky-900/70 text-sky-200 px-1.5 py-0.5 rounded-md">+Bonus</span>
           )}
@@ -515,7 +521,10 @@ export default function AlumnosPage() {
   // Chips nivel 1: disciplinas disponibles con conteo (orden dinámico)
   const discsDisponibles = useMemo(() => {
     const map = {}
-    ;(data || []).forEach(a => { map[a.disciplina] = (map[a.disciplina] || 0) + 1 })
+    ;(data || []).forEach(a => {
+      map[a.disciplina] = (map[a.disciplina] || 0) + 1
+      if (a.disciplina_2) map[a.disciplina_2] = (map[a.disciplina_2] || 0) + 1
+    })
     // Primero los del orden conocido, luego cualquier extra no conocido
     const conocidas = discOrder.filter(d => map[d]).map(d => ({ disc: d, count: map[d] }))
     const extras = Object.keys(map).filter(d => !discOrder.includes(d)).map(d => ({ disc: d, count: map[d] }))
@@ -526,16 +535,28 @@ export default function AlumnosPage() {
   const freqsDisponibles = useMemo(() => {
     if (!discFilter) return []
     const map = {}
-    ;(data || []).filter(a => a.disciplina === discFilter)
-      .forEach(a => { map[a.frecuencia] = (map[a.frecuencia] || 0) + 1 })
+    ;(data || []).forEach(a => {
+      if (a.disciplina === discFilter && a.frecuencia) map[a.frecuencia] = (map[a.frecuencia] || 0) + 1
+      else if (a.disciplina_2 === discFilter && a.frecuencia_2) map[a.frecuencia_2] = (map[a.frecuencia_2] || 0) + 1
+    })
     return FREQ_ORDER.filter(f => map[f]).map(f => ({ freq: f, count: map[f] }))
   }, [data, discFilter])
 
   const rango = RANGOS_DIAS.find(r => r.id === rangoDias)
   const alumnos = (data || []).filter((a) => {
     if (busqueda && !`${a.nombre} ${a.apellido} ${a.celular || ''}`.toLowerCase().includes(busqueda.toLowerCase())) return false
-    if (discFilter && a.disciplina !== discFilter) return false
-    if (freqFilter && a.frecuencia !== freqFilter) return false
+    if (discFilter) {
+      const enPrincipal = a.disciplina === discFilter
+      const enSegunda   = a.disciplina_2 === discFilter
+      if (!enPrincipal && !enSegunda) return false
+      // La frecuencia relevante depende de por cuál actividad matchea
+      if (freqFilter) {
+        const freqOk = (enPrincipal && a.frecuencia === freqFilter) || (enSegunda && a.frecuencia_2 === freqFilter)
+        if (!freqOk) return false
+      }
+    } else if (freqFilter && a.frecuencia !== freqFilter) {
+      return false
+    }
     if (tabConfig.maxDias !== undefined && a.dias_sin_pago > tabConfig.maxDias) return false
     if (tabConfig.minDias !== undefined && a.dias_sin_pago < tabConfig.minDias) return false
     if (rangoDias !== 'todos' && (a.dias_sin_pago < rango.min || a.dias_sin_pago > rango.max)) return false
