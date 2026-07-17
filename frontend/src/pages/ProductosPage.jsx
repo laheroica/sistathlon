@@ -62,6 +62,7 @@ function CatalogoTab() {
   const ubicaciones = useUbicaciones()
   const [modal, setModal] = useState(null)       // 'new' | producto (editar)
   const [movModal, setMovModal] = useState(null) // 'ingreso' | 'envio' | 'ajuste'
+  const [filtroUbic, setFiltroUbic] = useState('')  // '' = todas
   const [saveError, setSaveError] = useState('')
   const [form, setForm] = useState({ nombre: '', categoria: 'indumentaria', precio: '', activo: true })
 
@@ -129,6 +130,21 @@ function CatalogoTab() {
         </button>
       </div>
 
+      {/* Filtro por ubicación: ver el stock de un lugar en particular */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-4">
+        <span className="text-xs text-dark-muted mr-1">Ver stock en:</span>
+        {[{ val: '', label: 'Todas' }, ...ubicaciones].map(u => (
+          <button
+            key={u.val || 'todas'}
+            onClick={() => setFiltroUbic(u.val)}
+            className={clsx('px-3 py-1 rounded-lg text-xs font-medium border transition-colors',
+              filtroUbic === u.val ? 'bg-primary-dark text-white border-primary-dark' : 'bg-dark-surface text-dark-muted border-dark-border hover:text-dark-text')}
+          >
+            {u.val === DEPOSITO ? 'Depósito' : u.label}
+          </button>
+        ))}
+      </div>
+
       {CATEGORIAS.map(({ val, label }) => (
         <div key={val} className="mb-6">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-dark-muted mb-2">{label}</h3>
@@ -138,8 +154,10 @@ function CatalogoTab() {
               <div className="grid gap-2">
                 {agrupado[val].map(p => {
                   const stock = p.stock_ubic || {}
+                  const chips = filtroUbic ? ubicaciones.filter(u => u.val === filtroUbic) : ubicaciones
+                  const sinStockAca = filtroUbic && (stock[filtroUbic] || 0) === 0
                   return (
-                    <div key={p.id} className={clsx('flex items-center gap-3 bg-dark-card border border-dark-border rounded-lg px-3 py-2 flex-wrap', !p.activo && 'opacity-50')}>
+                    <div key={p.id} className={clsx('flex items-center gap-3 bg-dark-card border border-dark-border rounded-lg px-3 py-2 flex-wrap', !p.activo && 'opacity-50', sinStockAca && 'opacity-40')}>
                       <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium shrink-0', CAT_COLOR[p.categoria])}>{p.categoria_label}</span>
                       <span className="flex-1 text-sm text-dark-text min-w-[120px]">{p.nombre}</span>
                       <div className="text-right shrink-0">
@@ -150,7 +168,7 @@ function CatalogoTab() {
                       </div>
                       {/* Stock por ubicación */}
                       <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                        {ubicaciones.map(u => {
+                        {chips.map(u => {
                           const q = stock[u.val] || 0
                           return (
                             <span key={u.val} className={clsx(
