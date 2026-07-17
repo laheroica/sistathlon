@@ -703,6 +703,7 @@ function CtaCteTab() {
   const { sedeLabel } = useNegocio()
   const [expanded, setExpanded]   = useState(null)
   const [pagoModal, setPagoModal] = useState(null)
+  const [ventaModal, setVentaModal] = useState(null)  // id de venta para ver el detalle
 
   const { data: deudores = [], isLoading } = useQuery({
     queryKey: ['deudores'],
@@ -753,7 +754,13 @@ function CtaCteTab() {
                       <div key={m.id} className="flex items-center gap-2 text-xs">
                         <span className="text-dark-muted w-20">{m.fecha}</span>
                         <span className={clsx('px-1.5 py-0.5 rounded text-xs', m.tipo === 'cargo' ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300')}>{m.tipo_label}</span>
-                        <span className="flex-1 text-dark-muted truncate">{m.descripcion}</span>
+                        {m.venta ? (
+                          <button onClick={() => setVentaModal(m.venta)} className="flex-1 text-left text-sky-400 hover:text-sky-300 truncate underline decoration-dotted underline-offset-2">
+                            {m.descripcion} — ver detalle
+                          </button>
+                        ) : (
+                          <span className="flex-1 text-dark-muted truncate">{m.descripcion}</span>
+                        )}
                         <span className={clsx('font-mono font-medium', m.tipo === 'cargo' ? 'text-red-400' : 'text-green-400')}>
                           {m.tipo === 'cargo' ? '+' : '-'}{money(m.monto)}
                         </span>
@@ -778,7 +785,52 @@ function CtaCteTab() {
           isPending={pagoMut.isPending}
         />
       )}
+
+      {ventaModal && <VentaDetalleModal ventaId={ventaModal} onClose={() => setVentaModal(null)} />}
     </div>
+  )
+}
+
+// ── Modal: detalle de una venta (qué compró y cuándo) ───────────────────────────
+
+function VentaDetalleModal({ ventaId, onClose }) {
+  const { sedeLabel } = useNegocio()
+  const { data: venta, isLoading, isError } = useQuery({
+    queryKey: ['venta-detalle', ventaId],
+    queryFn: () => api.get(`/productos/ventas/${ventaId}/`).then(r => r.data),
+  })
+
+  return (
+    <Modal title={`Venta #${ventaId}`} onClose={onClose}>
+      {isLoading ? <div className="text-dark-muted text-sm">Cargando...</div>
+        : isError || !venta ? <div className="text-red-400 text-sm">No se pudo cargar la venta.</div>
+        : (
+          <div className="space-y-3 text-sm">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-dark-muted">
+              <span>Fecha: <span className="text-dark-text">{venta.fecha}</span></span>
+              <span>Comprador: <span className="text-dark-text">{venta.alumno_nombre}</span></span>
+              <span>Sede: <span className="text-dark-text">{sedeLabel(venta.sede)}</span></span>
+              <span>Método: <span className="text-dark-text">{venta.metodo_label}</span></span>
+            </div>
+            <div className="border border-dark-border rounded-lg divide-y divide-dark-border">
+              {(venta.items || []).map(it => (
+                <div key={it.id} className="flex items-center justify-between px-3 py-2">
+                  <span className="text-dark-text">{it.cantidad}× {it.producto_nombre}</span>
+                  <span className="font-mono text-dark-text">{money(it.subtotal)}</span>
+                </div>
+              ))}
+              {(venta.items || []).length === 0 && (
+                <div className="px-3 py-2 text-dark-muted text-xs">Sin ítems.</div>
+              )}
+            </div>
+            <div className="flex justify-between font-semibold text-dark-text">
+              <span>Total</span><span className="font-mono">{money(venta.total)}</span>
+            </div>
+            {venta.notas && <p className="text-xs text-dark-muted">Notas: {venta.notas}</p>}
+          </div>
+        )
+      }
+    </Modal>
   )
 }
 
