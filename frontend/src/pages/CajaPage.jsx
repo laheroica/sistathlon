@@ -121,7 +121,7 @@ export default function CajaPage() {
 
       {/* Resumen KPIs */}
       {resumen && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <KpiCaja
             icon={DollarSign}
             label="Cuotas cobradas"
@@ -129,6 +129,14 @@ export default function CajaPage() {
             sub={`${resumen.cant_cuotas} pagos`}
             color="text-green-400"
             bg="bg-green-900/40"
+          />
+          <KpiCaja
+            icon={ArrowUpCircle}
+            label="Ventas y cobros"
+            value={money((resumen.ingresos_productos || 0) + (resumen.ingresos_cta_corriente || 0))}
+            sub={`Productos${resumen.ingresos_cta_corriente ? ' + cta. cte.' : ''}`}
+            color="text-emerald-400"
+            bg="bg-emerald-900/40"
           />
           <KpiCaja
             icon={ArrowUpCircle}
@@ -150,7 +158,7 @@ export default function CajaPage() {
             icon={Scale}
             label="Balance neto"
             value={money(resumen.balance)}
-            sub="Cuotas + ingresos − egresos"
+            sub="Cuotas + ventas + ingresos − egresos"
             color={resumen.balance >= 0 ? 'text-green-400' : 'text-red-400'}
             bg={resumen.balance >= 0 ? 'bg-green-900/40' : 'bg-red-900/40'}
           />

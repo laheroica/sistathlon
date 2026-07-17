@@ -78,7 +78,7 @@ def resumen_mes(request):
     ingresos_cuotas = float(pagos_qs.aggregate(t=Sum('monto'))['t'] or 0)
     cant_cuotas     = pagos_qs.count()
 
-    from apps.productos.models import Venta
+    from apps.productos.models import Venta, MovimientoCuentaCorriente
     ventas_qs = Venta.objects.filter(
         fecha__year=anio, fecha__month=mes_n,
         metodo_pago__in=['efectivo', 'transferencia'],
@@ -88,14 +88,27 @@ def resumen_mes(request):
     ingresos_productos = float(ventas_qs.aggregate(t=Sum('total'))['t'] or 0)
     cant_ventas        = ventas_qs.count()
 
+    # Cobros de cuenta corriente (deudas de productos cobradas este mes).
+    # Se cuentan cuando entra la plata, no cuando se hizo la venta a crédito.
+    cc_qs = MovimientoCuentaCorriente.objects.filter(
+        tipo='pago', fecha__year=anio, fecha__month=mes_n,
+    )
+    if sede:
+        cc_qs = cc_qs.filter(alumno__sede=sede)
+    ingresos_cta_corriente = float(cc_qs.aggregate(t=Sum('monto'))['t'] or 0)
+    cant_cobros_cc         = cc_qs.count()
+
     return Response({
-        'ingresos_cuotas':    ingresos_cuotas,
-        'cant_cuotas':        cant_cuotas,
-        'ingresos_caja':      ingresos_caja,
-        'egresos_caja':       egresos_caja,
-        'ingresos_productos': ingresos_productos,
-        'cant_ventas':        cant_ventas,
-        'balance':            ingresos_cuotas + ingresos_caja + ingresos_productos - egresos_caja,
+        'ingresos_cuotas':        ingresos_cuotas,
+        'cant_cuotas':            cant_cuotas,
+        'ingresos_caja':          ingresos_caja,
+        'egresos_caja':           egresos_caja,
+        'ingresos_productos':     ingresos_productos,
+        'cant_ventas':            cant_ventas,
+        'ingresos_cta_corriente': ingresos_cta_corriente,
+        'cant_cobros_cc':         cant_cobros_cc,
+        'balance': ingresos_cuotas + ingresos_caja + ingresos_productos
+                   + ingresos_cta_corriente - egresos_caja,
     })
 
 
