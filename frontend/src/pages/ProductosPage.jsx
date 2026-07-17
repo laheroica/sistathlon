@@ -145,19 +145,22 @@ function CatalogoTab() {
         ))}
       </div>
 
-      {CATEGORIAS.map(({ val, label }) => (
+      {CATEGORIAS.map(({ val, label }) => {
+        // Con una ubicación filtrada, mostrar solo los productos con stock ahí
+        const items = filtroUbic ? agrupado[val].filter(p => (p.stock_ubic?.[filtroUbic] || 0) > 0) : agrupado[val]
+        if (filtroUbic && items.length === 0) return null   // ocultar categoría vacía
+        return (
         <div key={val} className="mb-6">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-dark-muted mb-2">{label}</h3>
-          {agrupado[val].length === 0
+          {items.length === 0
             ? <p className="text-dark-muted text-sm">Sin productos</p>
             : (
               <div className="grid gap-2">
-                {agrupado[val].map(p => {
+                {items.map(p => {
                   const stock = p.stock_ubic || {}
                   const chips = filtroUbic ? ubicaciones.filter(u => u.val === filtroUbic) : ubicaciones
-                  const sinStockAca = filtroUbic && (stock[filtroUbic] || 0) === 0
                   return (
-                    <div key={p.id} className={clsx('flex items-center gap-3 bg-dark-card border border-dark-border rounded-lg px-3 py-2 flex-wrap', !p.activo && 'opacity-50', sinStockAca && 'opacity-40')}>
+                    <div key={p.id} className={clsx('flex items-center gap-3 bg-dark-card border border-dark-border rounded-lg px-3 py-2 flex-wrap', !p.activo && 'opacity-50')}>
                       <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium shrink-0', CAT_COLOR[p.categoria])}>{p.categoria_label}</span>
                       <span className="flex-1 text-sm text-dark-text min-w-[120px]">{p.nombre}</span>
                       <div className="text-right shrink-0">
@@ -191,7 +194,12 @@ function CatalogoTab() {
             )
           }
         </div>
-      ))}
+        )
+      })}
+
+      {filtroUbic && !productos.some(p => (p.stock_ubic?.[filtroUbic] || 0) > 0) && (
+        <p className="text-dark-muted text-sm">No hay stock en esta ubicación.</p>
+      )}
 
       {(modal === 'new' || (modal && modal.id)) && (
         <Modal title={modal?.id ? 'Editar producto' : 'Nuevo producto'} onClose={() => setModal(null)}>
