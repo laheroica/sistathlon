@@ -408,6 +408,10 @@ export default function GastosPage() {
 // ── Sub-componente: grupo de gastos fijos (colapsable) ────────────────────────
 
 function GrupoFijos({ grupo, fijos, sede, mes, onAdd, onEdit, onDelete }) {
+  const { sedeColor } = useNegocio()
+  const sedeBadge = (sd) => sd === 'general'
+    ? { label: 'Gral', color: GENERAL_COLOR }
+    : { label: sd, color: sedeColor(sd) }
   const [open, setOpen] = useState(false)
 
   const totalGrupo = grupo.conceptos.reduce((sum, c) => {
