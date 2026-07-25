@@ -21,11 +21,12 @@ const ESTADO_COLOR = {
   baja: 'text-orange-400', alejado: 'text-red-400', temporal: 'text-sky-400',
 }
 
-// Genera opciones de mes: 5 meses atrás hasta 2 adelante
+// Genera opciones de mes: 8 meses atrás hasta 2 adelante
+// (permite cargar deudas de hasta ~6+ meses de antigüedad)
 function mesOptions() {
   const opts = []
   const hoy = new Date()
-  for (let i = -5; i <= 2; i++) {
+  for (let i = -8; i <= 2; i++) {
     const d = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1)
     opts.push({
       value: format(d, 'yyyy-MM-dd'),

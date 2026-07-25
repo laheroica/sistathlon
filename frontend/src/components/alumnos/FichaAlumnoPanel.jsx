@@ -37,7 +37,8 @@ const COMBO_OPTS = [
 function mesOptions() {
   const opts = []
   const hoy  = new Date()
-  for (let i = -1; i <= 2; i++) {
+  // 8 meses atrás hasta 2 adelante (permite cargar deudas viejas)
+  for (let i = -8; i <= 2; i++) {
     const d = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1)
     opts.push({
       value: format(d, 'yyyy-MM-dd'),
