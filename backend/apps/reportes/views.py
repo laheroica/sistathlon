@@ -13,18 +13,35 @@ from apps.alumnos.permissions import IsSadmin
 def dashboard(request):
     from apps.alumnos.models import Alumno
     from apps.pagos.models import Pago
+    from apps.productos.models import Venta
 
     hoy        = date.today()
     mes_actual = date(hoy.year, hoy.month, 1)
     mes_ant    = date(hoy.year, hoy.month - 1, 1) if hoy.month > 1 else date(hoy.year - 1, 12, 1)
 
-    rec_actual  = Pago.objects.filter(mes=mes_actual).aggregate(t=Sum('monto'))['t'] or 0
-    rec_ant     = Pago.objects.filter(mes=mes_ant).aggregate(t=Sum('monto'))['t'] or 0
-    pagos_hoy   = Pago.objects.filter(fecha_pago=hoy).count()
+    # Cuotas (Pago) por mes
+    cuotas_actual = Pago.objects.filter(mes=mes_actual).aggregate(t=Sum('monto'))['t'] or 0
+    cuotas_ant    = Pago.objects.filter(mes=mes_ant).aggregate(t=Sum('monto'))['t'] or 0
+
+    # Ventas de artículos (indumentaria, bebidas, etc.) por mes — la Venta usa
+    # `fecha` real, así que filtramos por año/mes.
+    def ventas_del_mes(d):
+        return Venta.objects.filter(
+            fecha__year=d.year, fecha__month=d.month
+        ).aggregate(t=Sum('total'))['t'] or 0
+
+    ventas_actual = ventas_del_mes(mes_actual)
+    ventas_ant    = ventas_del_mes(mes_ant)
+
+    # Recaudación TOTAL = cuotas + ventas de artículos
+    rec_actual = float(cuotas_actual) + float(ventas_actual)
+    rec_ant    = float(cuotas_ant)    + float(ventas_ant)
+    pagos_hoy  = Pago.objects.filter(fecha_pago=hoy).count()
 
     # Alumnos distintos que pagaron la cuota del mes corriente
     pagaron_mes = Pago.objects.filter(mes=mes_actual).values('alumno').distinct().count()
-    ticket_promedio = round(float(rec_actual) / pagaron_mes, 2) if pagaron_mes else 0
+    # Ticket promedio: siempre sobre CUOTAS / alumnos (no ensuciar con artículos)
+    ticket_promedio = round(float(cuotas_actual) / pagaron_mes, 2) if pagaron_mes else 0
 
     estados = dict(
         Alumno.objects.filter(activo=True)
@@ -41,8 +58,9 @@ def dashboard(request):
             mes_n += 12
             anio  -= 1
         d = date(anio, mes_n, 1)
-        total = Pago.objects.filter(mes=d).aggregate(t=Sum('monto'))['t'] or 0
-        meses_grafico.append({'mes': d.strftime('%b %Y'), 'total': float(total)})
+        cuotas_m = Pago.objects.filter(mes=d).aggregate(t=Sum('monto'))['t'] or 0
+        total = float(cuotas_m) + float(ventas_del_mes(d))
+        meses_grafico.append({'mes': d.strftime('%b %Y'), 'total': total})
 
     disc_mes = list(
         Pago.objects.filter(mes=mes_actual)
@@ -75,9 +93,11 @@ def dashboard(request):
 
     return Response({
         'recaudacion': {
-            'mes_actual':  float(rec_actual),
-            'mes_anterior': float(rec_ant),
-            'variacion_pct': round((float(rec_actual) - float(rec_ant)) / float(rec_ant) * 100, 1) if rec_ant else 0,
+            'mes_actual':  rec_actual,          # TOTAL (cuotas + ventas)
+            'mes_anterior': rec_ant,            # TOTAL (cuotas + ventas)
+            'cuotas':      float(cuotas_actual),
+            'ventas':      float(ventas_actual),
+            'variacion_pct': round((rec_actual - rec_ant) / rec_ant * 100, 1) if rec_ant else 0,
             'pagos_hoy':   pagos_hoy,
             'pagaron_mes': pagaron_mes,
             'ticket_promedio': ticket_promedio,

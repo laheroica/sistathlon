@@ -142,10 +142,20 @@ export default function DashboardPage() {
           label="Recaudado este mes"
           value={money(recaudacion.mes_actual)}
           sub={
-            <span className={clsx('flex items-center gap-1', subioBajo ? 'text-green-400' : 'text-red-400')}>
-              {subioBajo ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-              {subioBajo ? '+' : ''}{recaudacion.variacion_pct}% vs {mesAnteriorLabel}
-            </span>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-dark-muted">Cuotas</span>
+                <span className="text-dark-text font-medium tabular-nums">{money(recaudacion.cuotas ?? 0)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-dark-muted">Indumentaria</span>
+                <span className="text-dark-text font-medium tabular-nums">{money(recaudacion.ventas ?? 0)}</span>
+              </div>
+              <span className={clsx('flex items-center gap-1 pt-0.5', subioBajo ? 'text-green-400' : 'text-red-400')}>
+                {subioBajo ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                {subioBajo ? '+' : ''}{recaudacion.variacion_pct}% vs {mesAnteriorLabel}
+              </span>
+            </div>
           }
           color="text-green-400"
           iconBg="bg-green-900/40"
