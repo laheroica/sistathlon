@@ -25,6 +25,55 @@ const hoyMes = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+const MESES_CORTO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+// "YYYY-MM-DD" → "Mar 2026"
+function fmtMesLabel(mesStr) {
+  const [y, m] = mesStr.split('-')
+  return `${MESES_CORTO[parseInt(m, 10) - 1]} ${y}`
+}
+
+// Meses transcurridos desde un mes (YYYY-MM-...) hasta hoy
+function mesesDesde(mesStr) {
+  const [y, m] = mesStr.split('-').map(Number)
+  const hoy = new Date()
+  return (hoy.getFullYear() - y) * 12 + (hoy.getMonth() + 1 - m)
+}
+
+// Etiqueta del valor según el tipo de liquidación
+function labelValor(v, tipo) {
+  if (tipo === 'fijo')       return v.sueldo_fijo ? money(v.sueldo_fijo) : '—'
+  if (tipo === 'porcentaje') return v.porcentaje ? `${v.porcentaje}% de ${money(v.base ?? 0)}` : '—'
+  if (tipo === 'mixto')      return `${v.sueldo_fijo ? money(v.sueldo_fijo) : '$0'}${v.porcentaje ? ' + ' + v.porcentaje + '% de ' + money(v.base ?? 0) : ''}`
+  return v.valor_hora ? `${money(v.valor_hora)}/h` : '—'   // hora
+}
+
+// "Firma" del valor para detectar cuándo cambió
+function sigDe(v, tipo) {
+  if (tipo === 'fijo')       return String(v.sueldo_fijo ?? '')
+  if (tipo === 'porcentaje') return `${v.porcentaje ?? ''}|${v.base ?? ''}`
+  if (tipo === 'mixto')      return `${v.sueldo_fijo ?? ''}|${v.porcentaje ?? ''}|${v.base ?? ''}`
+  return String(v.valor_hora ?? '')   // hora
+}
+
+// Agrupa el historial de valores en períodos: un período por cada cambio de valor.
+// Devuelve [{desde, hasta, label}] con el más reciente primero.
+function historialCambios(valores, tipo) {
+  if (!valores?.length) return []
+  const asc = [...valores].sort((a, b) => a.mes.localeCompare(b.mes))
+  const periodos = []
+  for (const v of asc) {
+    const sig = sigDe(v, tipo)
+    const last = periodos[periodos.length - 1]
+    if (last && last.sig === sig) {
+      last.hasta = v.mes
+    } else {
+      periodos.push({ sig, desde: v.mes, hasta: v.mes, label: labelValor(v, tipo) })
+    }
+  }
+  return periodos.reverse()
+}
+
 export default function ProfePanel({ profe, onClose, onSaved }) {
   const { sedeOptions } = useNegocio()
   const SEDES = [
@@ -72,6 +121,10 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
   const tipoLiq = watch('tipo_liquidacion')
   const colorSel = watch('color')
   const montoPorcentajePreview = (parseFloat(tarifa.porcentaje) || 0) * (parseFloat(tarifa.base) || 0) / 100
+
+  // Historial de valor hora agrupado por cambios (más reciente primero)
+  const periodosTarifa = isEdit ? historialCambios(profe.valores_hora, tipoLiq) : []
+  const mesesSinCambio = periodosTarifa.length ? mesesDesde(periodosTarifa[0].desde) : 0
 
   async function onSubmit(data) {
     setSaving(true); setError('')
@@ -238,20 +291,33 @@ export default function ProfePanel({ profe, onClose, onSaved }) {
                   Tarifa por mes
                 </p>
 
-                {/* Historial rápido */}
-                {profe.valores_hora?.length > 0 && (
-                  <div className="space-y-1 max-h-32 overflow-y-auto">
-                    {profe.valores_hora.slice(0, 6).map(v => (
-                      <div key={v.id} className="flex justify-between text-xs text-dark-muted px-1">
-                        <span>{v.mes.slice(5, 7)}/{v.mes.slice(0, 4)}</span>
-                        <span className="text-dark-text font-medium">
-                          {tipoLiq === 'hora'       && v.valor_hora  && `${money(v.valor_hora)}/h`}
-                          {tipoLiq === 'fijo'       && v.sueldo_fijo && money(v.sueldo_fijo)}
-                          {tipoLiq === 'porcentaje' && v.porcentaje  && `${v.porcentaje}% de ${money(v.base ?? 0)}`}
-                          {tipoLiq === 'mixto'      && `${v.sueldo_fijo ? money(v.sueldo_fijo) : '$0'}${v.porcentaje ? ' + '+v.porcentaje+'% de '+money(v.base ?? 0) : ''}`}
-                        </span>
-                      </div>
-                    ))}
+                {/* Historial de valor hora: agrupado por cambios */}
+                {periodosTarifa.length > 0 && (
+                  <div className="bg-dark-bg/50 border border-dark-border rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-dark-muted uppercase tracking-wider">Historial</span>
+                      <span className={clsx(
+                        'text-xs px-2 py-0.5 rounded-full font-medium',
+                        mesesSinCambio >= 4 ? 'bg-amber-900/40 text-amber-300' : 'bg-dark-border text-dark-muted'
+                      )}>
+                        {mesesSinCambio <= 0 ? 'Actualizado este mes'
+                          : `Sin cambios hace ${mesesSinCambio} ${mesesSinCambio === 1 ? 'mes' : 'meses'}`}
+                      </span>
+                    </div>
+                    <div className="space-y-1 max-h-44 overflow-y-auto">
+                      {periodosTarifa.map((p, i) => (
+                        <div key={p.desde} className="flex items-center justify-between text-xs px-1">
+                          <span className={i === 0 ? 'text-dark-text font-medium' : 'text-dark-muted'}>
+                            {i === 0
+                              ? `Desde ${fmtMesLabel(p.desde)} · vigente`
+                              : (p.desde === p.hasta ? fmtMesLabel(p.desde) : `${fmtMesLabel(p.desde)} – ${fmtMesLabel(p.hasta)}`)}
+                          </span>
+                          <span className={clsx('font-semibold', i === 0 ? 'text-dark-text' : 'text-dark-muted')}>
+                            {p.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
