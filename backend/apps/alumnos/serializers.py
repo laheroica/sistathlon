@@ -140,16 +140,29 @@ class AlumnoPatchSerializer(serializers.ModelSerializer):
     frecuencia = serializers.CharField(max_length=10, required=False)
     disciplina_2 = serializers.CharField(max_length=10, required=False, allow_blank=True)
     frecuencia_2 = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    dni = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
     class Meta:
         model = Alumno
         fields = [
-            'disciplina', 'frecuencia', 'horario', 'horario_combo', 'estado',
+            'dni', 'disciplina', 'frecuencia', 'horario', 'horario_combo', 'estado',
             'cuota_actual', 'combo', 'bonus_pack', 'notas',
             'disciplina_2', 'frecuencia_2', 'sede_2', 'horario_2',
             'pertenencia', 'porcentaje_athlon', 'precio_especial', 'motivo_precio_especial',
             'celular', 'email', 'instagram', 'nombre', 'apellido', 'sede',
         ]
+
+    def validate_dni(self, value):
+        import uuid
+        value = (value or '').strip().replace('.', '').replace('-', '')
+        if not value:
+            return f'SIN-DNI-{uuid.uuid4().hex[:8].upper()}'
+        qs = Alumno.objects.filter(dni=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("Ya existe un alumno con ese DNI.")
+        return value
 
     def validate_horario(self, value):
         return normalizar_horario(value)
