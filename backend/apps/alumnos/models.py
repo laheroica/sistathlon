@@ -92,6 +92,11 @@ class Alumno(models.Model):
     sede_2       = models.CharField(max_length=10, blank=True, default='')  # código de Sede; puede diferir de sede
     horario_2    = models.CharField(max_length=20, blank=True, default='')
 
+    # Beneficios (QR): UUID del sistema de beneficios en Google (hoja "Beneficios Athlon").
+    # Vacío = el alumno todavía no tiene QR asignado.
+    beneficio_id = models.CharField(max_length=60, blank=True, default='',
+        help_text='UUID del QR de beneficios (sistema externo en Google).')
+
     # Pertenencia (espacio que gestiona al alumno)
     pertenencia = models.CharField(max_length=10, choices=Pertenencia.choices, default=Pertenencia.ATHLON)
     porcentaje_athlon = models.DecimalField(max_digits=5, decimal_places=2, default=100,

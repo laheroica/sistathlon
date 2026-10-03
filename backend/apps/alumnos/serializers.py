@@ -26,11 +26,19 @@ class NegocioConfigSerializer(serializers.ModelSerializer):
         fields = ['nombre', 'ciudad', 'logo_claro', 'logo_oscuro', 'nombre_sede1', 'nombre_sede2']
 
 
+def qr_beneficios_url(beneficio_id):
+    """Arma el link del QR de beneficios a partir del id, o '' si no tiene."""
+    from django.conf import settings
+    bid = (beneficio_id or '').strip()
+    return f"{settings.BENEFICIOS_QR_BASE}{bid}" if bid else ''
+
+
 class AlumnoListSerializer(serializers.ModelSerializer):
     nombre_completo = serializers.ReadOnlyField()
     dias_hasta_vencimiento = serializers.SerializerMethodField()
     ultimo_pago = serializers.SerializerMethodField()
     dias_sin_pago = serializers.SerializerMethodField()
+    beneficio_qr_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Alumno
@@ -40,8 +48,12 @@ class AlumnoListSerializer(serializers.ModelSerializer):
             'disciplina_2', 'frecuencia_2', 'sede_2', 'horario_2',
             'tipo_precio', 'cuota_actual', 'estado', 'fecha_inicio',
             'pertenencia', 'porcentaje_athlon', 'precio_especial', 'motivo_precio_especial',
+            'beneficio_id', 'beneficio_qr_url',
             'dias_hasta_vencimiento', 'ultimo_pago', 'dias_sin_pago',
         ]
+
+    def get_beneficio_qr_url(self, obj):
+        return qr_beneficios_url(obj.beneficio_id)
 
     def get_dias_hasta_vencimiento(self, obj):
         return obj.dias_hasta_vencimiento()
@@ -113,7 +125,7 @@ class AlumnoCreateSerializer(serializers.ModelSerializer):
             'nombre', 'apellido', 'dni', 'celular', 'email', 'instagram', 'fecha_nacimiento',
             'sede', 'fecha_inicio', 'disciplina', 'frecuencia', 'combo', 'bonus_pack',
             'horario', 'horario_combo', 'disciplina_2', 'frecuencia_2', 'sede_2', 'horario_2',
-            'tipo_precio', 'cuota_actual', 'notas',
+            'tipo_precio', 'cuota_actual', 'notas', 'beneficio_id',
             'pertenencia', 'porcentaje_athlon', 'precio_especial', 'motivo_precio_especial',
         ]
 
@@ -141,13 +153,14 @@ class AlumnoPatchSerializer(serializers.ModelSerializer):
     disciplina_2 = serializers.CharField(max_length=10, required=False, allow_blank=True)
     frecuencia_2 = serializers.CharField(max_length=10, required=False, allow_blank=True)
     dni = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    beneficio_qr_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Alumno
         fields = [
             'dni', 'disciplina', 'frecuencia', 'horario', 'horario_combo', 'estado',
             'cuota_actual', 'combo', 'bonus_pack', 'notas',
-            'disciplina_2', 'frecuencia_2', 'sede_2', 'horario_2',
+            'disciplina_2', 'frecuencia_2', 'sede_2', 'horario_2', 'beneficio_id', 'beneficio_qr_url',
             'pertenencia', 'porcentaje_athlon', 'precio_especial', 'motivo_precio_especial',
             'celular', 'email', 'instagram', 'nombre', 'apellido', 'sede',
         ]
@@ -172,3 +185,6 @@ class AlumnoPatchSerializer(serializers.ModelSerializer):
 
     def validate_horario_2(self, value):
         return normalizar_horario(value)
+
+    def get_beneficio_qr_url(self, obj):
+        return qr_beneficios_url(obj.beneficio_id)

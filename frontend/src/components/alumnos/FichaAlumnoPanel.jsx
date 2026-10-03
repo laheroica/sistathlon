@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { DollarSign, Calendar, CreditCard, Check, Trash2, AlertTriangle } from 'lucide-react'
+import { DollarSign, Calendar, CreditCard, Check, Trash2, AlertTriangle, QrCode, Download, Copy } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -292,6 +292,50 @@ export default function FichaAlumnoPanel({ alumno: alumnoInit, open, onClose }) 
             </div>
           ))}
         </div>
+
+        {/* ── Beneficios (QR) ─────────────────────────────────────────── */}
+        {(() => {
+          const qrUrl = alumno.beneficio_qr_url
+          const img = (dpi) => `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(qrUrl)}&code=QRCode&dpi=${dpi}&imagetype=Png`
+          return (
+            <div className="card space-y-3">
+              <p className="text-xs font-semibold text-dark-muted uppercase tracking-wider flex items-center gap-1.5">
+                <QrCode size={13} /> QR de beneficios
+              </p>
+              {qrUrl ? (
+                <div className="flex items-start gap-4">
+                  <img src={img(120)} alt="QR de beneficios" className="w-32 h-32 bg-white rounded-lg p-1.5 shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <p className="text-xs text-dark-muted">El alumno presenta este QR en los comercios adheridos.</p>
+                    <a href={img(300)} target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-dark-border bg-dark-bg text-dark-muted hover:text-dark-text transition-colors">
+                      <Download size={13} /> Descargar imagen
+                    </a>
+                    <button type="button"
+                      onClick={() => { navigator.clipboard?.writeText(qrUrl); toast.success('Link copiado') }}
+                      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-dark-border bg-dark-bg text-dark-muted hover:text-dark-text transition-colors ml-2">
+                      <Copy size={13} /> Copiar link
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-dark-muted">Este alumno todavía no tiene QR asignado. Pegá su id abajo.</p>
+              )}
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-xs text-dark-muted w-20 shrink-0">ID beneficio</span>
+                <div className="flex-1 min-w-0">
+                  <CampoEditable
+                    label="ID beneficio"
+                    value={alumno.beneficio_id}
+                    type="text"
+                    placeholder="Sin asignar"
+                    onSave={(val) => patchAlumno.mutate({ beneficio_id: val })}
+                  />
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* ── BLOQUE 1: Confirmar actividad ───────────────────────────── */}
         <div className="card space-y-4">

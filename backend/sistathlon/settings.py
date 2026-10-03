@@ -145,3 +145,10 @@ SESSION_COOKIE_HTTPONLY = True
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+# Sistema de beneficios (QR). Link base de la app de Google; el QR de cada
+# alumno = BENEFICIOS_QR_BASE + beneficio_id. Configurable por env var.
+BENEFICIOS_QR_BASE = config(
+    'BENEFICIOS_QR_BASE',
+    default='https://script.google.com/macros/s/AKfycbx86rSQ66-_12c1-pbD_PviSTbGrEuF1s2dNw7z0zonyfjWxZ6cd2WwCrio66e8NKy0Zg/exec?id=',
+)
